@@ -1,0 +1,10 @@
+{
+  "projectId": "trolycvp",
+  "appId": "1:476536748991:web:54db9f7960a9a79ef3bf0a",
+  "apiKey": "AIzaSyCXg8zV7UBYAwWxmUfSiaUlNLHmUbl_qP0",
+  "authDomain": "trolycvp.firebaseapp.com",
+  "databaseURL": "https://trolycvp-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "storageBucket": "trolycvp.firebasestorage.app",
+  "messagingSenderId": "476536748991",
+  "measurementId": "G-KCXREEVDC8"
+}

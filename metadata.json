@@ -1,0 +1,6 @@
+{
+  "name": "Trợ lý Tham mưu Văn bản",
+  "description": "Hệ thống trợ lý tham mưu xử lý, bóc tách thông tin văn bản hành chính và quản lý nhiệm vụ thông minh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
