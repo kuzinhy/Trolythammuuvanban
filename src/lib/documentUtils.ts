@@ -24,6 +24,20 @@ export function parseDateString(dateStr: string | null | undefined): Date | null
 }
 
 export function getDocumentProgressStatus(docItem: Partial<Document>): DocumentProgressStatus {
+  const procResult = (docItem.processingResult || '').toUpperCase();
+  const docStatus = (docItem.status || '').toUpperCase();
+  const isCompleted = procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || docStatus === 'COMPLETED';
+
+  if (isCompleted) {
+    return {
+      type: 'IN_TIME',
+      label: 'Đã hoàn thành',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
+      daysDiff: null,
+      deadlineText: docItem.actionDeadline || 'Đã xong'
+    };
+  }
+
   const deadlineStr = docItem.actionDeadline || (docItem.deadlines && docItem.deadlines[0]);
   if (!deadlineStr) {
     return {

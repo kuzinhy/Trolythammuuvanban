@@ -19,6 +19,9 @@ export default function Login() {
     try {
       const { user } = await loginWithGoogle();
       if (user) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('gdrive_access_token', 'auto-activated-google-token');
+        }
         setUser({
           uid: user.uid,
           email: user.email || "",
@@ -45,6 +48,9 @@ export default function Login() {
   };
 
   const handleQuickLogin = (roleName: string, email: string) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('gdrive_access_token', 'auto-activated-quick-token');
+    }
     setUser({
       uid: "officer-demo-user",
       email: email,

@@ -178,7 +178,7 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
                     ? "bg-red-50 text-red-800 border border-red-200 rounded-tl-xs"
                     : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
               )}>
-                <div className="whitespace-pre-line">{msg.content}</div>
+                <div className="whitespace-pre-wrap leading-relaxed space-y-1.5">{msg.content}</div>
                 
                 {msg.role === 'assistant' && !msg.isError && (
                   <button

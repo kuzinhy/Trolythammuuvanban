@@ -183,33 +183,28 @@ export default function DocumentList() {
     <div className="space-y-5 font-sans transform-gpu">
       
       {/* Header & Metric Cards Banner */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-200">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
-                <FileText className="w-5 h-5" />
-              </span>
-              <h1 className="text-lg font-black text-blue-950 uppercase tracking-wide">
-                Văn Bản Đến & Trình Bí Thư Đảng Ủy
-              </h1>
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Sổ tiếp nhận, tham mưu phân luồng & xem xét bút phê chỉ đạo cấp ủy
-            </p>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+              <FileText className="w-4 h-4" />
+            </span>
+            <h1 className="text-base font-black text-blue-950 uppercase tracking-wide">
+              Văn Bản Đến & Trình Bí Thư Đảng Ủy
+            </h1>
           </div>
 
           <Link 
             to="/" 
-            className="px-4 py-2 text-xs font-extrabold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Tiếp nhận văn bản mới</span>
           </Link>
         </div>
 
         {/* 4 Compact Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           <div 
             onClick={() => setFilterType('ALL')}
             className={`p-3 rounded-2xl border transition-all cursor-pointer ${

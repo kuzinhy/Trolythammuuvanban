@@ -348,24 +348,17 @@ export default function DirectiveDrafting() {
     <div className="max-w-7xl mx-auto space-y-6 font-sans pb-12 px-4 md:px-6">
       
       {/* Top Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-blue-800/60 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2 relative z-10">
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 rounded-2xl p-4 md:p-5 text-white shadow-md border border-blue-800/60 flex items-center justify-between gap-4">
+        <div className="space-y-1 relative z-10">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
+            <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
               Trợ lý AI Gemini Cấp ủy
             </span>
-            <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[10px] font-bold uppercase tracking-wider">
-              Chỉ đạo Thường trực Đảng ủy
-            </span>
           </div>
-          <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-            <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+          <h1 className="text-base md:text-lg font-black tracking-tight text-white flex items-center gap-2">
             <span>Soạn Thảo Ý Kiến Kết Luận & Chỉ Đạo</span>
           </h1>
-          <p className="text-xs md:text-sm text-slate-200 max-w-2xl leading-relaxed font-medium">
-            Số hóa quy trình ban hành kết luận chỉ đạo. Gọn gàng, thông minh, tự động đối chiếu nghị quyết và gợi ý 2 phương án văn phong chuẩn mực.
-          </p>
         </div>
       </div>
 

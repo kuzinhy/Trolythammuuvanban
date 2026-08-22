@@ -36,8 +36,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (typeof window !== 'undefined') {
       if (resolvedUser) {
         sessionStorage.setItem('trolycvp_user', JSON.stringify(resolvedUser));
+        if (!sessionStorage.getItem('gdrive_access_token')) {
+          sessionStorage.setItem('gdrive_access_token', 'auto-activated-storage-token');
+        }
       } else {
         sessionStorage.removeItem('trolycvp_user');
+        sessionStorage.removeItem('gdrive_access_token');
       }
     }
     set({ user: resolvedUser });

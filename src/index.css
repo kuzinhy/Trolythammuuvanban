@@ -15,7 +15,7 @@
 
 /* Modern Blue Frosted Glass / Blur utility classes */
 .glass-card {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(226, 232, 240, 0.8);
@@ -41,6 +41,56 @@
 
 .blue-glow-hover:hover {
   box-shadow: 0 8px 30px -4px rgba(37, 99, 235, 0.15);
+}
+
+/* TinHocGenZ & High-Tech Modern EdTech Effects */
+.genz-card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.genz-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -8px rgba(37, 99, 235, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.genz-gradient-text {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.genz-gradient-badge {
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.9) 0%, rgba(224, 231, 255, 0.9) 100%);
+  border: 1px solid rgba(199, 210, 254, 0.8);
+}
+
+.genz-glow-blue {
+  position: relative;
+}
+.genz-glow-blue::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 2rem;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.genz-pulse {
+  animation: pulse-subtle 3s infinite ease-in-out;
 }
 
 /* Print styling for Phiếu Trình / Phiếu Xử lý Văn bản */

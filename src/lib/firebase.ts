@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy, where, updateDoc, onSnapshot, writeBatch, serverTimestamp } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy, where, updateDoc, onSnapshot, writeBatch, serverTimestamp, limit } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 // Initialize Firebase with trolycvp project configuration
@@ -105,4 +105,4 @@ export const logout = async () => {
   }
 };
 
-export { app, analytics, auth, db, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy, where, updateDoc, onSnapshot, writeBatch, serverTimestamp };
+export { app, analytics, auth, db, collection, addDoc, getDocs, doc, setDoc, deleteDoc, query, orderBy, where, updateDoc, onSnapshot, writeBatch, serverTimestamp, limit };

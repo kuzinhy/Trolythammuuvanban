@@ -93,7 +93,9 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     for (const task of tasks) {
-      if (task.status === 'COMPLETED' || (task.id && completedIds.has(task.id))) continue;
+      const tStatus = (task.status || '').toUpperCase();
+      const isTaskCompleted = tStatus === 'COMPLETED' || tStatus === 'ĐÃ HOÀN THÀNH' || tStatus === 'HOÀN THÀNH';
+      if (isTaskCompleted || (task.id && completedIds.has(task.id))) continue;
       if (!task.dueDate) continue;
 
       const dueDateObj = parseDateString(task.dueDate);
@@ -133,6 +135,10 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
     for (const docItem of documents) {
       if (!docItem.actionDeadline) continue;
       if (docItem.reminderEnabled === false) continue;
+      const procResult = (docItem.processingResult || '').toUpperCase();
+      const docStatus = (docItem.status || '').toUpperCase();
+      const isDocCompleted = procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || docStatus === 'COMPLETED';
+      if (isDocCompleted) continue;
       const dueDateObj = parseDateString(docItem.actionDeadline);
       if (!dueDateObj) continue;
 
@@ -481,7 +487,9 @@ export function TaskReminderAlertBanner({ tasks, documents = [] }: { tasks: Task
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     for (const t of tasks) {
-      if (t.status === 'COMPLETED' || !t.dueDate) continue;
+      const tStatus = (t.status || '').toUpperCase();
+      const isTaskCompleted = tStatus === 'COMPLETED' || tStatus === 'ĐÃ HOÀN THÀNH' || tStatus === 'HOÀN THÀNH';
+      if (isTaskCompleted || !t.dueDate) continue;
       const d = parseDateString(t.dueDate);
       if (!d) continue;
 
@@ -493,8 +501,27 @@ export function TaskReminderAlertBanner({ tasks, documents = [] }: { tasks: Task
       else if (diffDays <= 3) dueSoon++;
     }
 
+    for (const docItem of documents) {
+      if (!docItem.actionDeadline) continue;
+      if (docItem.reminderEnabled === false) continue;
+      const procResult = (docItem.processingResult || '').toUpperCase();
+      const docStatus = (docItem.status || '').toUpperCase();
+      const isDocCompleted = procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || docStatus === 'COMPLETED';
+      if (isDocCompleted) continue;
+      const d = parseDateString(docItem.actionDeadline);
+      if (!d) continue;
+
+      const docDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffDays = Math.round((docDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+      const thresholdDays = docItem.reminderDaysBefore ?? 3;
+
+      if (diffDays < 0) overdue++;
+      else if (diffDays === 0) dueToday++;
+      else if (diffDays <= thresholdDays) dueSoon++;
+    }
+
     return { overdue, dueToday, dueSoon, total: overdue + dueToday + dueSoon };
-  }, [tasks]);
+  }, [tasks, documents]);
 
   if (reminderCounts.total === 0) return null;
 

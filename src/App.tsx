@@ -20,7 +20,7 @@ import Admin from "./pages/Admin";
 import DirectiveDrafting from "./pages/DirectiveDrafting";
 import DigitalMap from "./pages/DigitalMap";
 import DocumentAudit from "./pages/DocumentAudit";
-import Reports from "./pages/Reports";
+import AiAssistant from "./pages/AiAssistant";
 
 export default function App() {
   const { setUser, setInitialized, isInitialized, user } = useAuthStore();
@@ -68,7 +68,7 @@ export default function App() {
           <Route path="map" element={<DigitalMap />} />
           <Route path="directive" element={<DirectiveDrafting />} />
           <Route path="audit" element={<DocumentAudit />} />
-          <Route path="reports" element={<Reports />} />
+          <Route path="ai-assistant" element={<AiAssistant />} />
           <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>

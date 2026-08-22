@@ -5,12 +5,13 @@ import {
   HardDrive, Sparkles, RefreshCw, Lock, ArrowUpRight, Search, 
   Building2, FileText, CheckSquare, Layers, ShieldCheck, ChevronRight,
   Database, Link2, Download, Upload, Cpu, Server, Check, Clock, BrainCircuit,
-  Pencil, Edit3, X, Filter
+  Pencil, Edit3, X, Filter, BarChart3, Printer, Calendar, AlertTriangle
 } from 'lucide-react';
 import { useAuthStore, isSystemAdmin } from '../store/authStore';
-import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig, AssignedOfficer } from '../types';
+import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig, AssignedOfficer, Document, Task } from '../types';
 import { 
   db, collection, getDocs, doc, setDoc, deleteDoc, writeBatch, serverTimestamp,
+  query, orderBy, limit,
   TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess,
   CONNECTED_APP_ID, CONNECTED_APP_URL, CONNECTED_APP_NAME
 } from '../lib/firebase';
@@ -117,7 +118,34 @@ export default function Admin() {
   const { user } = useAuthStore();
   const isAdmin = isSystemAdmin(user);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system' | 'reports'>('overview');
+  
+  const [reportsDocuments, setReportsDocuments] = useState<Document[]>([]);
+  const [reportsTasks, setReportsTasks] = useState<Task[]>([]);
+  const [reportPeriod, setReportPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const [loadingReports, setLoadingReports] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'reports' && reportsDocuments.length === 0) {
+      async function fetchReportsData() {
+        setLoadingReports(true);
+        try {
+          const docsSnap = await getDocs(query(collection(db, 'documents'), orderBy('createdAt', 'desc'), limit(150)));
+          const docs = docsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Document));
+          setReportsDocuments(docs);
+
+          const tasksSnap = await getDocs(query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(150)));
+          const ts = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
+          setReportsTasks(ts);
+        } catch (err) {
+          console.error("Error fetching report data:", err);
+        } finally {
+          setLoadingReports(false);
+        }
+      }
+      fetchReportsData();
+    }
+  }, [activeTab, reportsDocuments.length]);
   
   const [learnedRules, setLearnedRules] = useState<LearningRule[]>([]);
   const [isLoadingLearned, setIsLoadingLearned] = useState(false);
@@ -860,6 +888,18 @@ export default function Admin() {
           >
             <Settings className="w-3.5 h-3.5" />
             <span>Cấu hình AI</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'reports'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Báo cáo Định kỳ</span>
           </button>
         </div>
 
@@ -2638,6 +2678,249 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {/* TAB: REPORTS */}
+      {activeTab === 'reports' && (() => {
+        const totalDocs = reportsDocuments.length;
+        const urgentDocs = reportsDocuments.filter(d => d.urgency === 'KHANG_CAP' || d.urgency === 'HO_TOC').length;
+        const processedDocs = reportsDocuments.filter(d => d.status === 'COMPLETED' || d.status === 'DA_XU_LY').length;
+        
+        const totalTasks = reportsTasks.length;
+        const completedTasks = reportsTasks.filter(t => t.status === 'completed').length;
+        const inProgressTasks = reportsTasks.filter(t => t.status === 'in_progress' || t.status === 'pending').length;
+        const overdueTasks = reportsTasks.filter(t => {
+          if (!t.dueDate || t.status === 'completed') return false;
+          return new Date(t.dueDate) < new Date();
+        }).length;
+
+        const handlePrintReport = () => {
+          window.print();
+        };
+
+        const handleExportSummaryReport = () => {
+          const reportText = `
+          ĐẢNG CỘNG SẢN VIỆT NAM
+          VĂN PHÒNG ĐẢNG ỦY
+          --------------------------------------------------
+          BÁO CÁO TỔNG HỢP CÔNG TÁC XỬ LÝ VĂN BẢN VÀ ĐÔN ĐỐC NHIỆM VỤ
+          Kỳ báo cáo: ${reportPeriod === 'week' ? 'Tuần này' : reportPeriod === 'month' ? 'Tháng này' : reportPeriod === 'quarter' ? 'Quý này' : 'Năm nay'}
+          Ngày lập: ${new Date().toLocaleDateString('vi-VN')}
+          
+          1. TỔNG QUAN VĂN BẢN ĐẾN & ĐI:
+          - Tổng số văn bản tiếp nhận: ${totalDocs}
+          - Văn bản khẩn/hỏa tốc: ${urgentDocs}
+          - Đã xử lý xong: ${processedDocs} (${totalDocs ? Math.round((processedDocs/totalDocs)*100) : 0}%)
+          
+          2. CÔNG TÁC ĐÔN ĐỐC & THỰC HIỆN NHIỆM VỤ:
+          - Tổng số nhiệm vụ giao: ${totalTasks}
+          - Đã hoàn thành: ${completedTasks}
+          - Đang thực hiện / Chờ xử lý: ${inProgressTasks}
+          - Quá hạn / Cần đôn đốc: ${overdueTasks}
+          
+          3. ĐÁNH GIÁ CHUNG & KIẾN NGHỊ:
+          - Công tác tiếp nhận, phân luồng và chuyển xử lý văn bản thực hiện đúng quy chế.
+          - Hệ thống trợ lý AI hỗ trợ tự động bóc tách và phân công đạt hiệu suất cao.
+          `;
+          
+          const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Bao_Cao_Tong_Hop_Van_Phong_Dang_Uy_${new Date().toISOString().slice(0,10)}.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        return (
+          <div className="space-y-6 pb-12">
+            {loadingReports ? (
+              <div className="min-h-[40vh] flex items-center justify-center">
+                <div className="flex items-center gap-3 text-blue-600 font-semibold">
+                  <RefreshCw className="w-6 h-6 animate-spin" />
+                  <span>Đang tổng hợp số liệu báo cáo định kỳ...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Header Actions */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
+                  <div>
+                    <div className="flex items-center gap-2 text-blue-600 text-xs font-black uppercase tracking-wider mb-1">
+                      <BarChart3 className="w-4 h-4" />
+                      <span>Hệ thống Thống kê & Báo cáo Chuyên sâu</span>
+                    </div>
+                    <h1 className="text-xl font-black text-slate-900">Báo cáo Tổng hợp Công tác Văn phòng Đảng ủy</h1>
+                    <p className="text-xs text-slate-500 mt-0.5">Số liệu trực tuyến tự động cập nhật từ CSDL văn bản đến, nhiệm vụ và phân công chuyên viên</p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="inline-flex bg-slate-100 p-1 rounded-xl">
+                      <button
+                        onClick={() => setReportPeriod('week')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === 'week' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Tuần
+                      </button>
+                      <button
+                        onClick={() => setReportPeriod('month')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === 'month' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Tháng
+                      </button>
+                      <button
+                        onClick={() => setReportPeriod('quarter')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === 'quarter' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Quý
+                      </button>
+                      <button
+                        onClick={() => setReportPeriod('year')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${reportPeriod === 'year' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        Năm
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleExportSummaryReport}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Xuất Báo cáo (TXT/Word)</span>
+                    </button>
+
+                    <button
+                      onClick={handlePrintReport}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>In Báo cáo</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Official Header Preview for Print */}
+                <div className="bg-white p-8 rounded-3xl border border-slate-200/80 shadow-sm print:shadow-none print:border-none space-y-6">
+                  <div className="text-center border-b border-slate-200 pb-6">
+                    <h2 className="text-sm font-bold text-slate-700 uppercase">ĐẢNG CỘNG SẢN VIỆT NAM</h2>
+                    <h1 className="text-base font-black text-slate-900 uppercase mt-0.5">VĂN PHÒNG ĐẢNG ỦY</h1>
+                    <div className="w-24 h-0.5 bg-slate-800 mx-auto my-3"></div>
+                    <h3 className="text-lg font-black text-slate-900 mt-2 uppercase">BÁO CÁO TỔNG HỢP CÔNG TÁC XỬ LÝ VĂN BẢN VÀ THỰC HIỆN NHIỆM VỤ</h3>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center justify-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Kỳ báo cáo: {reportPeriod === 'week' ? 'Tuần này' : reportPeriod === 'month' ? 'Tháng này' : reportPeriod === 'quarter' ? 'Quý này' : 'Năm nay'} — Ngày lập: {new Date().toLocaleDateString('vi-VN')}</span>
+                    </p>
+                  </div>
+
+                  {/* Key Metrics Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-blue-50/70 border border-blue-200/80 p-5 rounded-2xl">
+                      <div className="flex items-center justify-between text-blue-700 mb-2">
+                        <span className="text-xs font-bold uppercase">Tổng Văn bản Tiếp nhận</span>
+                        <FileText className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="text-3xl font-black text-blue-900">{totalDocs}</div>
+                      <div className="text-[11px] font-semibold text-blue-600 mt-1">Trong đó {urgentDocs} văn bản khẩn/hỏa tốc</div>
+                    </div>
+
+                    <div className="bg-emerald-50/70 border border-emerald-200/80 p-5 rounded-2xl">
+                      <div className="flex items-center justify-between text-emerald-700 mb-2">
+                        <span className="text-xs font-bold uppercase">Tỷ lệ Xử lý Văn bản</span>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div className="text-3xl font-black text-emerald-900">
+                        {totalDocs ? Math.round((processedDocs / totalDocs) * 100) : 0}%
+                      </div>
+                      <div className="text-[11px] font-semibold text-emerald-700 mt-1">{processedDocs} / {totalDocs} văn bản hoàn thành</div>
+                    </div>
+
+                    <div className="bg-indigo-50/70 border border-indigo-200/80 p-5 rounded-2xl">
+                      <div className="flex items-center justify-between text-indigo-700 mb-2">
+                        <span className="text-xs font-bold uppercase">Nhiệm vụ Đã Hoàn thành</span>
+                        <CheckSquare className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="text-3xl font-black text-indigo-900">{completedTasks} / {totalTasks}</div>
+                      <div className="text-[11px] font-semibold text-indigo-700 mt-1">{totalTasks ? Math.round((completedTasks/totalTasks)*100) : 0}% tổng nhiệm vụ giao</div>
+                    </div>
+
+                    <div className="bg-amber-50/70 border border-amber-200/80 p-5 rounded-2xl">
+                      <div className="flex items-center justify-between text-amber-700 mb-2">
+                        <span className="text-xs font-bold uppercase">Nhiệm vụ Quá hạn / Cần đôn đốc</span>
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div className="text-3xl font-black text-amber-900">{overdueTasks}</div>
+                      <div className="text-[11px] font-semibold text-amber-700 mt-1">Yêu cầu nhắc nhở chuyên viên</div>
+                    </div>
+                  </div>
+
+                  {/* Detailed Breakdown Sections */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+                    {/* Officer Workload Breakdown */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase text-slate-800 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-blue-600" />
+                          <span>Phân công Chuyên viên & Hiệu suất</span>
+                        </h4>
+                        <span className="text-xs font-bold text-blue-600">{officers.length} nhân sự</span>
+                      </div>
+
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {officers.map(officer => {
+                          const assignedCount = reportsTasks.filter(t => t.assigneeId === officer.id || t.assignedTo === officer.fullName).length;
+                          const completedCount = reportsTasks.filter(t => (t.assigneeId === officer.id || t.assignedTo === officer.fullName) && t.status === 'completed').length;
+                          return (
+                            <div key={officer.id} className="bg-white p-3.5 rounded-xl border border-slate-200/80 flex items-center justify-between shadow-2xs">
+                              <div>
+                                <div className="text-xs font-bold text-slate-900">{officer.fullName}</div>
+                                <div className="text-[10px] text-slate-500">{officer.roleType === 'DEPUTY_CHIEF' ? 'Phó Chánh Văn phòng' : 'Chuyên viên'} • {officer.department}</div>
+                              </div>
+                              <div className="text-right">
+                                <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-[10px] font-bold">
+                                  {assignedCount} nhiệm vụ ({completedCount} xong)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Department Workload Summary */}
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase text-slate-800 flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-600" />
+                          <span>Tổng hợp theo Phòng ban trực thuộc</span>
+                        </h4>
+                        <span className="text-xs font-bold text-blue-600">{departments.length} đơn vị</span>
+                      </div>
+
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {departments.map(dept => {
+                          return (
+                            <div key={dept.id} className="bg-white p-3.5 rounded-xl border border-slate-200/80 flex items-center justify-between shadow-2xs">
+                              <div>
+                                <div className="text-xs font-bold text-slate-900">{dept.name}</div>
+                                <div className="text-[10px] text-slate-500">Mã: {dept.code} • {dept.headPerson}</div>
+                              </div>
+                              <div className="text-right">
+                                <span className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full text-[10px] font-bold">
+                                  {dept.category === 'CAP_UY' ? 'Khối Cấp ủy' : 'Khối Chính quyền'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

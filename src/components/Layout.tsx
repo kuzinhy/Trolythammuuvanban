@@ -10,7 +10,7 @@ import {
   FileText, LayoutDashboard, CheckSquare, LogOut, Search, 
   Sparkles, Building2, ChevronRight, HardDrive, ExternalLink, 
   ShieldAlert, Settings, Layers, ShieldCheck, MapPin, BarChart3,
-  Bell, BellRing, X, ArrowRight, AlertTriangle, CheckCircle2, FileSearch
+  Bell, BellRing, X, ArrowRight, AlertTriangle, CheckCircle2, FileSearch, Bot
 } from "lucide-react";
 import AIAssistant from "./AIAssistant";
 import { cn } from "../lib/utils";
@@ -86,212 +86,197 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
-      {/* Main Sidebar - Modern Royal Blue Theme */}
-      <aside className="w-64 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950 border-r border-blue-800/60 flex flex-col hidden md:flex text-blue-100 z-20">
+      {/* Main Sidebar - Pristine White & Royal Blue Tech Theme */}
+      <aside className="w-64 bg-white/95 backdrop-blur-xl border-r border-blue-100 flex flex-col hidden md:flex text-slate-700 z-20 shadow-xl shadow-blue-900/5">
         {/* Brand Header */}
-        <div className="p-5 border-b border-blue-800/80 bg-blue-950/80">
+        <div className="p-5 border-b border-blue-100/80 bg-gradient-to-r from-blue-50/80 to-white">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-500/30">
-              <Building2 className="w-5 h-5" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-600/30 ring-2 ring-blue-500/20">
+              <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xs font-black uppercase tracking-wider text-white">CHỈ ĐẠO CẤP ỦY</h1>
-              <p className="text-[10px] text-blue-200/80 font-semibold tracking-tight">Bí thư Đảng ủy Phường</p>
+              <h1 className="text-xs font-black uppercase tracking-wider text-blue-950">ĐẢNG ỦY PHƯỜNG</h1>
+              <p className="text-[10px] text-blue-600 font-bold tracking-tight">Cổng Điều hành Điện tử Tech</p>
             </div>
           </div>
         </div>
         
         {/* Navigation items */}
-        <nav className="flex-1 py-3 px-3 overflow-y-auto space-y-3.5">
+        <nav className="flex-1 py-4 px-3.5 overflow-y-auto space-y-4">
           {/* Group 1: Operational Work */}
           <div className="space-y-1">
-            <div className="px-3 pb-1 text-[10px] font-black text-blue-300/80 uppercase tracking-wider flex items-center justify-between">
-              <span>I. Quản lý Văn bản & Bút phê</span>
+            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Điều hành cốt lõi
             </div>
-
-            <NavLink
-              to="/documents"
-              className={({ isActive }) => cn(
-                "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 group",
-                isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
-              )}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <FileText className="w-4 h-4 flex-shrink-0 text-amber-300" />
-                <span className="truncate">Văn bản Đến</span>
-              </div>
-              {urgentCount > 0 && (
-                <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-pulse flex-shrink-0 shadow-xs">
-                  {urgentCount} KHẨN
-                </span>
-              )}
-            </NavLink>
 
             <NavLink
               to="/"
               end
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <LayoutDashboard className="w-4 h-4 flex-shrink-0 text-blue-200" />
+              <LayoutDashboard className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
               <span className="truncate">Bàn làm việc</span>
+            </NavLink>
+
+            <NavLink
+              to="/documents"
+              className={({ isActive }) => cn(
+                "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
+                isActive
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
+                <span className="truncate">Văn bản Đến</span>
+              </div>
+              {urgentCount > 0 && (
+                <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-pulse flex-shrink-0 shadow-xs">
+                  {urgentCount}
+                </span>
+              )}
             </NavLink>
 
             <NavLink
               to="/tasks"
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <CheckSquare className="w-4 h-4 flex-shrink-0 text-blue-200" />
-              <span className="truncate">Đôn đốc Nhiệm vụ</span>
+              <CheckSquare className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="truncate">Nhiệm vụ đôn đốc</span>
             </NavLink>
           </div>
 
           {/* Group 2: AI & GIS Decision Support */}
-          <div className="space-y-1 pt-2 border-t border-blue-800/60">
-            <div className="px-3 pb-1 text-[10px] font-black text-amber-300 uppercase tracking-wider flex items-center justify-between">
-              <span>II. Trợ lý AI & GIS</span>
+          <div className="space-y-1 pt-2 border-t border-slate-100">
+            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Tham mưu Trí tuệ AI</span>
             </div>
+
+            <NavLink
+              to="/ai-assistant"
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
+                isActive
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+              )}
+            >
+              <Bot className="w-4 h-4 text-amber-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="truncate">Trợ lý ảo Chánh VP</span>
+            </NavLink>
 
             <NavLink
               to="/directive"
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <Sparkles className="w-4 h-4 text-amber-300 flex-shrink-0" />
+              <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate">Soạn Chỉ đạo AI</span>
             </NavLink>
 
             <NavLink
               to="/audit"
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <FileSearch className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+              <FileSearch className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate">Rà soát Thể thức</span>
             </NavLink>
 
             <NavLink
               to="/search"
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <Search className="w-4 h-4 flex-shrink-0 text-blue-200" />
+              <Search className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
               <span className="truncate">Tra cứu Văn bản</span>
             </NavLink>
 
             <NavLink
               to="/map"
               className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <MapPin className="w-4 h-4 text-red-300 flex-shrink-0" />
+              <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate">Bản đồ Địa bàn</span>
             </NavLink>
 
-            <NavLink
-              to="/reports"
-              className={({ isActive }) => cn(
-                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
-                isActive
-                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
-                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
-              )}
-            >
-              <BarChart3 className="w-4 h-4 text-amber-300 flex-shrink-0" />
-              <span className="truncate">Báo cáo Định kỳ</span>
-            </NavLink>
+
           </div>
 
           {/* Group 3: System Administration & Storage */}
-          <div className="space-y-1 pt-2 border-t border-blue-800/60">
-            <div className="px-3 pb-1 text-[10px] font-black text-blue-300/80 uppercase tracking-wider flex items-center justify-between">
-              <span>III. Quản trị & Dữ liệu</span>
-              {isAdmin && <span className="px-1.5 py-0.2 bg-amber-400/20 text-amber-300 rounded text-[9px] font-black">ADMIN</span>}
+          <div className="space-y-1 pt-2 border-t border-slate-100">
+            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Hệ thống</span>
+              {isAdmin && <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded text-[9px] font-black">ADMIN</span>}
             </div>
 
             <NavLink
               to="/admin"
               className={({ isActive }) => cn(
-                "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-amber-600 text-white font-bold shadow-md shadow-amber-500/25"
-                  : "text-amber-200/90 hover:bg-blue-800/80 hover:text-white"
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <ShieldAlert className="w-4 h-4 text-amber-300 flex-shrink-0" />
+              <div className="flex items-center gap-3 min-w-0">
+                <ShieldAlert className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
                 <span className="truncate">Quản trị Hệ thống</span>
               </div>
               {isAdmin && (
-                <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse flex-shrink-0"></span>
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping flex-shrink-0"></span>
               )}
             </NavLink>
 
-            {/* Google Drive Storage Quick Link */}
-            <div className="pt-0.5">
-              <a
-                href={TARGET_DRIVE_FOLDER_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-2 rounded-xl bg-blue-900/50 hover:bg-blue-800/80 border border-blue-700/50 text-blue-100 text-xs font-medium transition-all group"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-5 h-5 rounded-lg bg-blue-800 border border-blue-600 flex items-center justify-center text-blue-300 flex-shrink-0">
-                    <HardDrive className="w-3 h-3" />
-                  </div>
-                  <span className="text-[11px] font-bold text-white truncate">Google Drive</span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-blue-300 group-hover:text-white transition-colors flex-shrink-0" />
-              </a>
-            </div>
           </div>
         </nav>
 
         {/* User profile footer */}
-        <div className="p-4 border-t border-blue-800/80 bg-blue-950">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/80">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 border border-blue-400 flex items-center justify-center text-xs font-bold text-white uppercase shadow-inner">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-200 flex items-center justify-center text-xs font-bold text-white uppercase shadow-sm">
               {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'A'}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+              <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
                 <span>{user?.displayName || user?.email?.split('@')[0]}</span>
                 {isAdmin && (
-                  <span className="px-1 py-0.2 bg-amber-400 text-blue-950 text-[8px] font-black rounded">AD</span>
+                  <span className="px-1.5 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-md">AD</span>
                 )}
               </div>
-              <div className="text-[10px] text-blue-200/70 truncate">{user?.email}</div>
+              <div className="text-[10px] text-slate-500 truncate">{user?.email}</div>
             </div>
             <button 
               onClick={logout} 
-              className="p-1.5 rounded-lg text-blue-200/70 hover:text-red-300 hover:bg-blue-800/80 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
               title="Đăng xuất"
             >
               <LogOut className="h-4 w-4" />
@@ -301,9 +286,9 @@ export default function Layout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
-        {/* Global Top Navbar - Flat Crisp Border */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between flex-shrink-0 z-30">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        {/* Global Top Navbar - Clean Bright Glassmorphic */}
+        <header className="h-16 bg-white/95 backdrop-blur-md border-b border-blue-100 px-6 flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
           {/* Breadcrumb / Page Title */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -323,6 +308,15 @@ export default function Layout() {
                 <span>{urgentCount} Văn bản Khẩn / Trễ</span>
               </button>
             )}
+
+            {/* GenZ Style High-Tech Live CSDL Sync Status Pill */}
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 rounded-xl text-[11px] font-bold shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>CSDL Liên thông Active</span>
+            </div>
           </div>
 
           {/* Center / Right Header Actions */}
@@ -442,15 +436,15 @@ export default function Layout() {
               )}
             </div>
 
-            {/* Gemini AI Assistant Button */}
+            {/* Gemini AI Assistant Button with GenZ Gradient & Glow */}
             <button
               onClick={() => setIsAIOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors active:scale-95 group cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.03] active:scale-[0.97] shadow-md shadow-indigo-500/20 group cursor-pointer border border-blue-400/30"
               title="Mở Trợ lý AI Tham mưu Gemini"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Trợ lý Gemini</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin-slow group-hover:rotate-12 transition-transform" />
+              <span>Trợ lý AI</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-300/40"></span>
             </button>
 
             {/* Direct Google Drive Folder Button */}
@@ -485,6 +479,26 @@ export default function Layout() {
       
       {/* On-Demand AI Assistant Drawer */}
       <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+
+      {/* GenZ Style Floating Floating AI Assistant Copilot FAB Button */}
+      {!isAIOpen && (
+        <button
+          onClick={() => setIsAIOpen(true)}
+          className="fixed bottom-6 right-6 z-40 p-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/30 hover:scale-110 active:scale-95 transition-all cursor-pointer group border border-white/20 flex items-center gap-2.5 backdrop-blur-md"
+          title="Trợ lý AI Tham mưu Điện tử"
+        >
+          <div className="relative">
+            <Bot className="w-5 h-5 text-white" />
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+            </span>
+          </div>
+          <span className="text-xs font-black uppercase tracking-wider hidden sm:inline group-hover:inline transition-all">
+            Hỏi AI Tham Mưu
+          </span>
+        </button>
+      )}
 
       {/* Global Task & Document Deadline Toast Notifications */}
       <TaskReminderToasts tasks={tasks} documents={documents} />

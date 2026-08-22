@@ -583,25 +583,45 @@ app.post('/api/summarize-document', async (req, res) => {
 // General Chat / Advice endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body;
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ error: 'Danh sách tin nhắn không hợp lệ' });
-    }
+    const { message, messages } = req.body;
+    let promptText = '';
 
-    const conversationHistory = messages
-      .map(m => `${m.role === 'user' ? 'Cán bộ' : 'Trợ lý Tham mưu'}: ${m.content}`)
-      .join('\n\n');
+    const formattingRule = `
+YÊU CẦU ĐỊNH DẠNG CÂU TRẢ LỜI (RẤT QUAN TRỌNG):
+1. TRẢ LỜI NGẮN GỌN, CÔ ĐỌNG, SẮC BẤN: Đi thẳng vào bản chất vấn đề tham mưu, không trả lời dài dòng hay lặp lại.
+2. BỐ CỤC PHÂN ĐOẠN RÕ RÀNG, DỄ ĐỌC:
+   - Chia câu trả lời thành các đề mục in đậm (ví dụ: **1. Đánh giá nhanh**, **2. Đề xuất xử lý**, **3. Phân công đôn đốc**).
+   - Mỗi đoạn văn không quá 2-3 câu, giữa các đoạn CÓ DÒNG TRỐNG để thông thoáng, dễ đọc.
+3. DÙNG GẠCH ĐẦU DÒNG VÀ BÔI ĐẬM KEYWORD:
+   - Sử dụng dấu gạch đầu dòng (-) cho từng ý tham mưu hoặc danh sách công việc.
+   - Bôi đậm (**từ khóa trọng tâm**) như tên đơn vị, thời hạn, cơ sở pháp lý.`;
 
-    const promptText = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy và Chính quyền địa phương.
+    if (message && typeof message === 'string' && message.trim()) {
+      promptText = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy và Chính quyền địa phương (Trợ lý Chánh Văn phòng cấp cao).
+Hãy hỗ trợ Chánh Văn phòng và Ban Thường vụ/Thường trực Đảng ủy một cách chuyên nghiệp, sắc bén, chính xác theo quy định Đảng và thể thức Nhà nước (Nghị định 30/2020/NĐ-CP).
+
+Nội dung yêu cầu / Câu hỏi:
+${message.trim()}
+
+${formattingRule}`;
+    } else if (Array.isArray(messages) && messages.length > 0) {
+      const conversationHistory = messages
+        .map(m => `${m.role === 'user' ? 'Cán bộ/Lãnh đạo' : 'Trợ lý Tham mưu'}: ${m.content}`)
+        .join('\n\n');
+
+      promptText = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy và Chính quyền địa phương.
 Hãy hỗ trợ chuyên viên, chánh văn phòng và lãnh đạo một cách chuyên nghiệp, chính xác theo quy định Đảng và thể thức Nhà nước (Nghị định 30/2020/NĐ-CP).
 
 Nội dung hội thoại:
 ${conversationHistory}
 
-Hãy đưa ra câu trả lời trực tiếp, cô đọng, hữu ích, chia đề mục rõ ràng nếu cần thiết:`;
+${formattingRule}`;
+    } else {
+      return res.status(400).json({ error: 'Nội dung câu hỏi hoặc danh sách tin nhắn không hợp lệ.' });
+    }
 
     const response = await generateContentWithFallback({
-      contents: promptText,
+      contents: [{ text: promptText }],
     });
 
     const reply = (response && response.text) ? response.text.normalize('NFC') : 'Tôi đã tiếp nhận yêu cầu. Đồng chí vui lòng đặt câu hỏi cụ thể hơn.';
@@ -1206,6 +1226,265 @@ Trả về định dạng JSON theo đúng schema.`
   } catch (err: any) {
     console.error("Audit document error:", err);
     res.status(500).json({ error: err.message || 'Lỗi rà soát văn bản hành chính.' });
+  }
+});
+
+// Endpoint to generate automated Weekly Schedule for Party Committee Standing Board & Office Leadership
+app.post('/api/generate-weekly-schedule', async (req, res) => {
+  try {
+    const { weekTitle, notes, documents = [], tasks = [] } = req.body;
+
+    const scheduleSchema = {
+      type: Type.OBJECT,
+      properties: {
+        weekTitle: { type: Type.STRING },
+        generalDirectivesSummary: { type: Type.STRING, description: "Định hướng trọng tâm chỉ đạo của Thường trực Đảng ủy trong tuần" },
+        days: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              dayOfWeek: { type: Type.STRING, description: "Thứ Hai, Thứ Ba, Thứ Tư, Thứ Năm, Thứ Sáu, Thứ Bảy, Chủ Nhật" },
+              date: { type: Type.STRING, description: "DD/MM/YYYY" },
+              morningEvents: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    time: { type: Type.STRING, description: "Ví dụ: 07:30 hoặc 08:00 - 11:30" },
+                    content: { type: Type.STRING, description: "Nội dung cuộc họp / buổi làm việc" },
+                    chairPerson: { type: Type.STRING, description: "Đồng chí Chủ trì (Ví dụ: Bí thư Đảng ủy, Phó Bí thư Thường trực, Chánh Văn phòng)" },
+                    attendees: { type: Type.STRING, description: "Thành phần tham dự" },
+                    location: { type: Type.STRING, description: "Địa điểm (Hội trường, Phòng họp số 1, Địa bàn khu phố)" },
+                    preparingUnit: { type: Type.STRING, description: "Đơn vị chuẩn bị nội dung" }
+                  },
+                  required: ['time', 'content', 'chairPerson', 'attendees', 'location', 'preparingUnit']
+                }
+              },
+              afternoonEvents: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    time: { type: Type.STRING, description: "Ví dụ: 13:30 hoặc 14:00 - 17:00" },
+                    content: { type: Type.STRING },
+                    chairPerson: { type: Type.STRING },
+                    attendees: { type: Type.STRING },
+                    location: { type: Type.STRING },
+                    preparingUnit: { type: Type.STRING }
+                  },
+                  required: ['time', 'content', 'chairPerson', 'attendees', 'location', 'preparingUnit']
+                }
+              }
+            },
+            required: ['dayOfWeek', 'date', 'morningEvents', 'afternoonEvents']
+          }
+        },
+        keyNotes: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Các lưu ý trọng tâm về công tác chuẩn bị tài liệu, trực cơ quan, trực PCCC, an ninh trật tự"
+        }
+      },
+      required: ['weekTitle', 'generalDirectivesSummary', 'days', 'keyNotes']
+    };
+
+    const docContext = documents.slice(0, 10).map((d: any) => `- ${d.documentNumber || 'Văn bản'}: ${d.title || d.fileName} (Chủ trì: ${d.leadDepartment || 'VP'}, Hạn: ${d.actionDeadline || 'N/A'})`).join('\n');
+    const taskContext = tasks.slice(0, 10).map((t: any) => `- ${t.title} (Phụ trách: ${t.assignedOrganization || 'VP'}, Hạn: ${t.dueDate || 'N/A'})`).join('\n');
+
+    const promptText = `Bạn là Chánh Văn phòng Đảng ủy Phường kiêm Trợ lý Tham mưu Tổng hợp Cấp ủy.
+Hãy xây dựng Lịch Công Tác Tuần (${weekTitle || 'Tuần làm việc tiếp theo'}) chính thức cho Thường trực Đảng ủy và Lãnh đạo Văn phòng, kết hợp các nhiệm vụ và văn bản trọng tâm sau:
+
+VĂN BẢN VÀ CHỈ ĐẠO CẦN XỬ LÝ TRONG TUẦN:
+${docContext || 'Chưa có văn bản đính kèm riêng.'}
+
+NHIỆM VỤ ĐÔN ĐỐC ĐẾN HẠN:
+${taskContext || 'Các nhiệm vụ thường quy.'}
+
+GHI CHÚ CHỈ ĐẠO BỔ SUNG CỦA BÍ THƯ / CHÁNH VP:
+${notes || 'Tập trung công tác giao ban, kiểm tra thực địa trật tự đô thị, PCCC, số hóa một cửa.'}
+
+YÊU CẦU:
+1. Lập lịch đầy đủ 7 ngày trong tuần (Thứ Hai đến Chủ Nhật).
+2. Sắp xếp hợp lý các cuộc họp giao ban Thường trực, tiếp công dân, làm việc với UBND, kiểm tra thực địa chi bộ khu phố, họp Khối Dân vận.
+3. Phân công rõ Chủ trì, Thành phần tham dự, Địa điểm và Đơn vị chuẩn bị tài liệu.
+4. Trả về định dạng JSON theo đúng schema quy định.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: scheduleSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể lập lịch công tác tuần.");
+    }
+  } catch (err: any) {
+    console.error("Weekly schedule generation error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi lập lịch công tác tuần.' });
+  }
+});
+
+// Endpoint to generate automated Meeting Conclusion Notice (Thông báo Kết luận)
+app.post('/api/generate-meeting-notice', async (req, res) => {
+  try {
+    const { meetingTitle, chairPerson, meetingDate, keyTopics, directives = [] } = req.body;
+
+    const noticeSchema = {
+      type: Type.OBJECT,
+      properties: {
+        documentNumber: { type: Type.STRING, description: "Số hiệu thông báo (ví dụ: 85-TB/VPTU)" },
+        title: { type: Type.STRING, description: "Trích yếu thông báo" },
+        meetingOverview: { type: Type.STRING, description: "Tóm tắt bối cảnh cuộc họp, thời gian, địa điểm, chủ trì, thành phần tham dự" },
+        conclusionsAndDirectives: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              topic: { type: Type.STRING, description: "Lĩnh vực / Chuyên đề đánh giá" },
+              assessment: { type: Type.STRING, description: "Đánh giá kết quả đạt được & tồn tại hạn chế" },
+              directiveContent: { type: Type.STRING, description: "Chỉ đạo cụ thể của Thường trực Đảng ủy" },
+              leadUnit: { type: Type.STRING, description: "Đơn vị chủ trì thực hiện" },
+              coordinatingUnits: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Các đơn vị phối hợp" },
+              completionDeadline: { type: Type.STRING, description: "Thời hạn hoàn thành" }
+            },
+            required: ['topic', 'assessment', 'directiveContent', 'leadUnit', 'coordinatingUnits', 'completionDeadline']
+          }
+        },
+        organizationAndMonitoring: {
+          type: Type.STRING,
+          description: "Phân công Văn phòng Đảng ủy / UBKT Đảng ủy đôn đốc, theo dõi, tổng hợp báo cáo Thường trực Đảng ủy."
+        },
+        fullFormattedDocument: {
+          type: Type.STRING,
+          description: "Toàn văn bản Thông báo Kết luận chuẩn thể thức 05-HD/VPTW trình bày bằng Markdown hoàn chỉnh."
+        }
+      },
+      required: ['documentNumber', 'title', 'meetingOverview', 'conclusionsAndDirectives', 'organizationAndMonitoring', 'fullFormattedDocument']
+    };
+
+    const promptText = `Bạn là Chánh Văn phòng Đảng ủy Phường.
+Hãy dự thảo THÔNG BÁO KẾT LUẬN CỦA THƯỜNG TRỰC ĐẢNG UỶ PHƯỜNG theo Hướng dẫn 05-HD/VPTW của Văn phòng Trung ương Đảng về thể thức văn bản Đảng.
+
+Thông tin cuộc họp:
+- Tên cuộc họp: ${meetingTitle || 'Họp Giao ban Thường trực Đảng ủy Phường'}
+- Chủ trì: ${chairPerson || 'Đồng chí Bí thư Đảng ủy Phường'}
+- Thời gian họp: ${meetingDate || 'Ngày gần nhất'}
+- Các nội dung trọng tâm đã thảo luận: ${keyTopics || 'Đánh giá công tác xây dựng Đảng, trật tự đô thị, CCHC và PCCC'}
+- Các chỉ đạo cụ thể của Bí thư / Thường trực: ${directives.join('; ') || 'Nêu rõ trách nhiệm đơn vị chủ trì, mốc thời hạn báo cáo'}
+
+Yêu cầu:
+1. Trích xuất thành các chỉ đạo sắc sảo, rõ người, rõ việc, rõ cơ quan chủ trì, rõ thời hạn hoàn thành.
+2. Đúng kết cấu Thông báo kết luận văn phòng Đảng ủy.
+3. Trả về đúng JSON Schema.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: noticeSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể dự thảo thông báo kết luận.");
+    }
+  } catch (err: any) {
+    console.error("Meeting notice generation error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi dự thảo thông báo kết luận.' });
+  }
+});
+
+// Endpoint for Multimodal Analysis (OCR, Hand-written Notes, Meeting Charts & Diagrams)
+app.post('/api/analyze-multimodal-file', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'Chưa đính kèm tệp đa phương thức (Hình ảnh / Sơ đồ / File ghi âm/ghi chép).' });
+    }
+
+    const fileBuffer = fs.readFileSync(file.path);
+    const base64Data = fileBuffer.toString('base64');
+    let mimeType = file.mimetype;
+    if (!mimeType || mimeType === 'application/octet-stream') {
+      if (file.originalname?.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+      else if (file.originalname?.toLowerCase().endsWith('.jpg') || file.originalname?.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+      else if (file.originalname?.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+      else mimeType = 'image/jpeg';
+    }
+
+    const multimodalSchema = {
+      type: Type.OBJECT,
+      properties: {
+        extractedTitle: { type: Type.STRING, description: "Tiêu đề hoặc trích yếu tổng quát bóc tách được từ hình ảnh/sơ đồ/tài liệu" },
+        mediaTypeDetected: { type: Type.STRING, description: "'Sơ đồ / Bảng biểu' | 'Ảnh ghi chép họp / Sổ tay' | 'Tài liệu quét OCR' | 'Bản đồ / Thực địa'" },
+        fullExtractedText: { type: Type.STRING, description: "Toàn bộ văn bản / nội dung ghi chép bóc tách được chính xác" },
+        keyConclusions: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Danh sách các kết luận, chỉ đạo hoặc dữ liệu trọng tâm bóc tách được"
+        },
+        extractedTasks: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              taskName: { type: Type.STRING },
+              assignedTo: { type: Type.STRING },
+              deadline: { type: Type.STRING },
+              priority: { type: Type.STRING, description: "'CAO' | 'TRUNG BÌNH' | 'THƯỜNG'" }
+            },
+            required: ['taskName', 'assignedTo', 'deadline', 'priority']
+          }
+        },
+        advisoryNotes: { type: Type.STRING, description: "Khuyến nghị của Trợ lý AI dành cho Chánh Văn phòng dựa trên hình ảnh/tài liệu này" }
+      },
+      required: ['extractedTitle', 'mediaTypeDetected', 'fullExtractedText', 'keyConclusions', 'extractedTasks', 'advisoryNotes']
+    };
+
+    const response = await generateContentWithFallback({
+      contents: [
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType
+          }
+        },
+        {
+          text: `Bạn là Chuyên gia AI Phân tích Đa Phương Thức (Multimodal Sight & OCR) của Văn phòng Cấp ủy.
+Hãy soi chiếu và phân tích kỹ lưỡng tệp hình ảnh/tài liệu/ghi chép cuộc họp/sơ đồ đính kèm.
+Nhiệm vụ:
+1. Nhận diện loại tệp đa phương thức.
+2. Trích xuất toàn bộ chữ viết, nội dung ghi chép, bảng biểu, sơ đồ hoặc thông tin chỉ đạo trong ảnh.
+3. Tổng hợp thành các kết luận cốt lõi và danh sách nhiệm vụ cụ thể phân công đơn vị thực hiện.
+4. Trả về đúng JSON Schema.`
+        }
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: multimodalSchema,
+      }
+    });
+
+    try { fs.unlinkSync(file.path); } catch (_) {}
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể phân tích tệp đa phương thức.");
+    }
+  } catch (err: any) {
+    console.error("Multimodal analysis error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi phân tích đa phương thức.' });
   }
 });
 
