@@ -18,6 +18,8 @@ import Login from "./pages/Login";
 import Search from "./pages/Search";
 import Admin from "./pages/Admin";
 import DirectiveDrafting from "./pages/DirectiveDrafting";
+import DigitalMap from "./pages/DigitalMap";
+import DocumentAudit from "./pages/DocumentAudit";
 
 export default function App() {
   const { setUser, setInitialized, isInitialized, user } = useAuthStore();
@@ -62,7 +64,9 @@ export default function App() {
           <Route path="documents/:id" element={<DocumentDetail />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="search" element={<Search />} />
+          <Route path="map" element={<DigitalMap />} />
           <Route path="directive" element={<DirectiveDrafting />} />
+          <Route path="audit" element={<DocumentAudit />} />
           <Route path="admin" element={<Admin />} />
         </Route>
       </Routes>

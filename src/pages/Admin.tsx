@@ -4,18 +4,22 @@ import {
   Activity, Save, Plus, Trash2, CheckCircle2, AlertCircle, 
   HardDrive, Sparkles, RefreshCw, Lock, ArrowUpRight, Search, 
   Building2, FileText, CheckSquare, Layers, ShieldCheck, ChevronRight,
-  Database, Link2, Download, Upload, Cpu, Server, Check, Clock
+  Database, Link2, Download, Upload, Cpu, Server, Check, Clock, BrainCircuit,
+  Pencil, Edit3, X, Filter
 } from 'lucide-react';
 import { useAuthStore, isSystemAdmin } from '../store/authStore';
 import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig } from '../types';
 import { 
-  db, collection, getDocs, doc, setDoc, writeBatch, serverTimestamp,
+  db, collection, getDocs, doc, setDoc, deleteDoc, writeBatch, serverTimestamp,
   TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess,
   CONNECTED_APP_ID, CONNECTED_APP_URL, CONNECTED_APP_NAME
 } from '../lib/firebase';
 import { 
   checkAppConnectionStatus, exportDatabaseBackup, importDatabaseBackup, DEFAULT_APP_CONNECTION 
 } from '../lib/syncService';
+import { 
+  getActiveLearningRules, saveLearnedAdjustmentRule, LearningRule 
+} from '../lib/learningEngine';
 
 // Initial default configuration datasets tailored for Party & Local Government administration
 const INITIAL_DEPARTMENTS: DepartmentConfig[] = [
@@ -103,7 +107,31 @@ export default function Admin() {
   const { user } = useAuthStore();
   const isAdmin = isSystemAdmin(user);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'routing' | 'departments' | 'legal' | 'system'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'legal' | 'system'>('overview');
+  
+  const [learnedRules, setLearnedRules] = useState<LearningRule[]>([]);
+  const [isLoadingLearned, setIsLoadingLearned] = useState(false);
+  const [showAddLearnedRule, setShowAddLearnedRule] = useState(false);
+  const [newLearnedRule, setNewLearnedRule] = useState({
+    keywordTrigger: '',
+    suggestedLeadDept: 'Văn phòng Cấp ủy',
+    suggestedAction: '',
+    notes: ''
+  });
+
+  // Google Drive AI Brain Engine states
+  const [isSyncingBrain, setIsSyncingBrain] = useState(false);
+  const [isImportingBrain, setIsImportingBrain] = useState(false);
+  const [isSynthesizingBrain, setIsSynthesizingBrain] = useState(false);
+  const [brainSyncStatus, setBrainSyncStatus] = useState<string | null>(null);
+  const [brainDriveInfo, setBrainDriveInfo] = useState<{
+    fileId?: string;
+    driveUrl?: string;
+    driveFolderUrl?: string;
+    updatedAt?: string;
+    sizeBytes?: number;
+    ruleCount?: number;
+  } | null>(null);
   
   // States with localStorage & Firestore persistence
   const [departments, setDepartments] = useState<DepartmentConfig[]>(() => {
@@ -163,13 +191,56 @@ export default function Admin() {
   const [newDept, setNewDept] = useState({ code: '', name: '', category: 'CAP_UY' as const, headPerson: '', keywords: '' });
   const [showAddDept, setShowAddDept] = useState(false);
 
+  // Edit Department State
+  const [editingDept, setEditingDept] = useState<DepartmentConfig | null>(null);
+  const [editingDeptKeywordsStr, setEditingDeptKeywordsStr] = useState('');
+
+  // Search & Filter State for Departments
+  const [deptSearchQuery, setDeptSearchQuery] = useState('');
+  const [deptCategoryFilter, setDeptCategoryFilter] = useState<'ALL' | 'CAP_UY' | 'CHINH_QUYEN' | 'DOAN_THE'>('ALL');
+
   // New Routing Rule Form state
   const [newRule, setNewRule] = useState({ targetAuthority: '', criteria: '', urgencyLevel: 'THUONG_KHAN' as const, suggestedLeadDept: 'Văn phòng Cấp ủy', defaultDeadlineDays: 3 });
   const [showAddRule, setShowAddRule] = useState(false);
 
+  // Edit Routing Rule State
+  const [editingRule, setEditingRule] = useState<RoutingRule | null>(null);
+  const [ruleSearchQuery, setRuleSearchQuery] = useState('');
+
+  const filteredRoutingRules = routingRules.filter(rule => {
+    if (!ruleSearchQuery.trim()) return true;
+    const q = ruleSearchQuery.toLowerCase();
+    return rule.targetAuthority.toLowerCase().includes(q) ||
+           rule.criteria.toLowerCase().includes(q) ||
+           rule.suggestedLeadDept.toLowerCase().includes(q);
+  });
+
+  const filteredDepartments = departments.filter(dept => {
+    const matchesCategory = deptCategoryFilter === 'ALL' || dept.category === deptCategoryFilter;
+    if (!matchesCategory) return false;
+    if (!deptSearchQuery.trim()) return true;
+    const q = deptSearchQuery.toLowerCase();
+    return dept.code.toLowerCase().includes(q) ||
+           dept.name.toLowerCase().includes(q) ||
+           (dept.keywords && dept.keywords.some(k => k.toLowerCase().includes(q)));
+  });
+
+  const loadLearnedRules = async () => {
+    setIsLoadingLearned(true);
+    try {
+      const rules = await getActiveLearningRules();
+      setLearnedRules(rules);
+    } catch (err) {
+      console.error("Error loading learned rules:", err);
+    } finally {
+      setIsLoadingLearned(false);
+    }
+  };
+
   // Run initial connection test on mount
   useEffect(() => {
     runConnectionDiagnostic();
+    loadLearnedRules();
   }, []);
 
   const runConnectionDiagnostic = async () => {
@@ -308,6 +379,196 @@ export default function Admin() {
     }
   };
 
+  // Export AI Brain Knowledge Base to Google Drive (_BO_NAO_THAM_MUU_AI.json)
+  const handleExportBrainToDrive = async () => {
+    setIsSyncingBrain(true);
+    setBrainSyncStatus("Đang đóng gói và mã hóa Bộ Não AI để tải lên Google Drive...");
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        token = await requestDriveAccess();
+      }
+
+      if (!token) {
+        setBrainSyncStatus("Cần chấp nhận quyền truy cập Google Drive để tiếp tục.");
+        setIsSyncingBrain(false);
+        return;
+      }
+
+      const res = await fetch('/api/drive/export-brain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceToken: token,
+          folderId: TARGET_DRIVE_FOLDER_ID,
+          learnedRules,
+          departments,
+          routingRules,
+          legalBases: legalBasis,
+          styleMemory: {
+            preferredStyles: ['Quyết liệt', 'Dân vận khéo'],
+            frequentSigners: ['Bí thư Đảng ủy', 'Chánh Văn phòng']
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setBrainSyncStatus("Đã sao lưu thành công Bộ Não AI lên Google Drive!");
+        setBrainDriveInfo({
+          fileId: data.driveFileId,
+          driveUrl: data.driveUrl,
+          driveFolderUrl: data.driveFolderUrl,
+          updatedAt: data.updatedAt,
+          sizeBytes: data.sizeBytes,
+          ruleCount: learnedRules.length
+        });
+      } else {
+        setBrainSyncStatus(`Lỗi xuất Bộ Não AI: ${data.error || 'Không xác định'}`);
+      }
+    } catch (err: any) {
+      console.error("Export brain error:", err);
+      setBrainSyncStatus(`Lỗi: ${err.message || 'Không thể đồng bộ'}`);
+    } finally {
+      setIsSyncingBrain(false);
+    }
+  };
+
+  // Import AI Brain Knowledge from Google Drive (_BO_NAO_THAM_MUU_AI.json)
+  const handleImportBrainFromDrive = async () => {
+    setIsImportingBrain(true);
+    setBrainSyncStatus("Đang truy vấn tệp _BO_NAO_THAM_MUU_AI.json trên Google Drive cơ quan...");
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        token = await requestDriveAccess();
+      }
+
+      if (!token) {
+        setBrainSyncStatus("Cần cấp quyền truy cập Google Drive để nạp Bộ Não AI.");
+        setIsImportingBrain(false);
+        return;
+      }
+
+      const res = await fetch('/api/drive/import-brain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceToken: token,
+          folderId: TARGET_DRIVE_FOLDER_ID
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.brainData) {
+        const brain = data.brainData;
+        
+        if (brain.learnedRules && Array.isArray(brain.learnedRules)) {
+          setLearnedRules(brain.learnedRules);
+        }
+        if (brain.departments && Array.isArray(brain.departments)) {
+          setDepartments(brain.departments);
+          localStorage.setItem('trolycvp_departments', JSON.stringify(brain.departments));
+        }
+        if (brain.routingRules && Array.isArray(brain.routingRules)) {
+          setRoutingRules(brain.routingRules);
+          localStorage.setItem('trolycvp_routing_rules', JSON.stringify(brain.routingRules));
+        }
+        if (brain.legalBases && Array.isArray(brain.legalBases)) {
+          setLegalBasis(brain.legalBases);
+          localStorage.setItem('trolycvp_legal_basis', JSON.stringify(brain.legalBases));
+        }
+
+        setBrainSyncStatus(`Đã nạp thành công Bộ Não AI! (${brain.learnedRules?.length || 0} quy tắc máy học, ${brain.departments?.length || 0} phòng ban)`);
+        setBrainDriveInfo({
+          fileId: data.fileId,
+          updatedAt: data.modifiedTime,
+          ruleCount: brain.learnedRules?.length || 0
+        });
+
+        // Batch save imported brain to Firestore
+        try {
+          const batch = writeBatch(db);
+          if (brain.departments) {
+            brain.departments.forEach((dept: any) => batch.set(doc(db, 'departments', dept.id), dept, { merge: true }));
+          }
+          if (brain.routingRules) {
+            brain.routingRules.forEach((rule: any) => batch.set(doc(db, 'routing_rules', rule.id), rule, { merge: true }));
+          }
+          if (brain.learnedRules) {
+            brain.learnedRules.forEach((lRule: any) => {
+              if (lRule.id) batch.set(doc(db, 'learning_rules', lRule.id), lRule, { merge: true });
+            });
+          }
+          await batch.commit();
+        } catch (fErr) {
+          console.warn("Could not write imported brain to Firestore in background:", fErr);
+        }
+
+      } else {
+        setBrainSyncStatus(`Lỗi: ${data.error || 'Không tìm thấy Bộ Não AI trên Google Drive'}`);
+      }
+    } catch (err: any) {
+      console.error("Import brain error:", err);
+      setBrainSyncStatus(`Lỗi: ${err.message || 'Không thể nạp tệp'}`);
+    } finally {
+      setIsImportingBrain(false);
+    }
+  };
+
+  // Synthesize Knowledge & Generate new AI Machine Learning Rules
+  const handleSynthesizeBrainKnowledge = async () => {
+    setIsSynthesizingBrain(true);
+    setBrainSyncStatus("AI Gemini đang phân tích các hồ sơ văn bản để tổng hợp quy tắc máy học mới...");
+    try {
+      // Fetch documents from Firestore
+      const snap = await getDocs(collection(db, 'documents'));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (docs.length === 0) {
+        setBrainSyncStatus("Chưa có hồ sơ văn bản trong CSDL để Gemini phân tích.");
+        setIsSynthesizingBrain(false);
+        return;
+      }
+
+      const res = await fetch('/api/brain/synthesize-knowledge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documents: docs,
+          existingRules: learnedRules
+        })
+      });
+
+      const data = await res.json();
+      if (data.newRules && Array.isArray(data.newRules) && data.newRules.length > 0) {
+        const addedRules: LearningRule[] = [];
+        for (const nr of data.newRules) {
+          const saved = await saveLearnedAdjustmentRule({
+            keywordTrigger: nr.keywordTrigger,
+            suggestedLeadDept: nr.suggestedLeadDept,
+            suggestedAction: nr.suggestedAction,
+            learnedAt: new Date().toLocaleDateString('vi-VN'),
+            confidence: nr.confidence || 95,
+            useCount: 1,
+            isActive: true,
+            notes: nr.notes || 'Tổng hợp tự động bởi AI Brain Synthesizer'
+          });
+          addedRules.push(saved);
+        }
+        await loadLearnedRules();
+        setBrainSyncStatus(`Gemini đã phát hiện và thêm ${addedRules.length} quy tắc máy học mới vào Bộ Não AI!`);
+      } else {
+        setBrainSyncStatus("Bộ Não AI hiện tại đã tối ưu toàn bộ quy tắc. Chưa phát hiện quy tắc mới.");
+      }
+    } catch (err: any) {
+      console.error("Synthesize knowledge error:", err);
+      setBrainSyncStatus(`Lỗi phân tích: ${err.message || 'Không thể tổng hợp'}`);
+    } finally {
+      setIsSynthesizingBrain(false);
+    }
+  };
+
   const handleAddDepartment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDept.code || !newDept.name) return;
@@ -320,9 +581,61 @@ export default function Admin() {
       keywords: newDept.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean),
       isDefaultLead: false,
     };
-    setDepartments([...departments, dept]);
+    const updated = [...departments, dept];
+    setDepartments(updated);
+    localStorage.setItem('trolycvp_departments', JSON.stringify(updated));
+    setDoc(doc(db, 'departments', dept.id), dept, { merge: true }).catch(err => console.warn("Firestore dept save error:", err));
     setNewDept({ code: '', name: '', category: 'CAP_UY', headPerson: '', keywords: '' });
     setShowAddDept(false);
+  };
+
+  const handleStartEditDepartment = (dept: DepartmentConfig) => {
+    setEditingDept({ ...dept });
+    setEditingDeptKeywordsStr(dept.keywords ? dept.keywords.join(', ') : '');
+  };
+
+  const handleSaveEditedDepartment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDept) return;
+
+    const formattedKeywords = editingDeptKeywordsStr
+      .split(',')
+      .map(k => k.trim().toLowerCase())
+      .filter(Boolean);
+
+    const updatedDept: DepartmentConfig = {
+      ...editingDept,
+      code: editingDept.code.toUpperCase(),
+      keywords: formattedKeywords
+    };
+
+    const updatedList = departments.map(d => d.id === updatedDept.id ? updatedDept : d);
+    setDepartments(updatedList);
+    localStorage.setItem('trolycvp_departments', JSON.stringify(updatedList));
+
+    // Save to Firestore in background
+    setDoc(doc(db, 'departments', updatedDept.id), updatedDept, { merge: true })
+      .catch(err => console.warn("Firestore update dept error:", err));
+
+    setEditingDept(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSaveEditedRule = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRule) return;
+
+    const updatedList = routingRules.map(r => r.id === editingRule.id ? editingRule : r);
+    setRoutingRules(updatedList);
+    localStorage.setItem('trolycvp_routing_rules', JSON.stringify(updatedList));
+
+    setDoc(doc(db, 'routing_rules', editingRule.id), editingRule, { merge: true })
+      .catch(err => console.warn("Firestore update rule error:", err));
+
+    setEditingRule(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   const handleAddRule = (e: React.FormEvent) => {
@@ -337,17 +650,26 @@ export default function Admin() {
       defaultDeadlineDays: Number(newRule.defaultDeadlineDays) || 3,
       isActive: true,
     };
-    setRoutingRules([...routingRules, rule]);
+    const updated = [...routingRules, rule];
+    setRoutingRules(updated);
+    localStorage.setItem('trolycvp_routing_rules', JSON.stringify(updated));
+    setDoc(doc(db, 'routing_rules', rule.id), rule, { merge: true }).catch(err => console.warn("Firestore rule save error:", err));
     setNewRule({ targetAuthority: '', criteria: '', urgencyLevel: 'THUONG_KHAN', suggestedLeadDept: 'Văn phòng Cấp ủy', defaultDeadlineDays: 3 });
     setShowAddRule(false);
   };
 
   const deleteDepartment = (id: string) => {
-    setDepartments(departments.filter(d => d.id !== id));
+    const updated = departments.filter(d => d.id !== id);
+    setDepartments(updated);
+    localStorage.setItem('trolycvp_departments', JSON.stringify(updated));
+    deleteDoc(doc(db, 'departments', id)).catch(err => console.warn("Firestore delete dept error:", err));
   };
 
   const deleteRule = (id: string) => {
-    setRoutingRules(routingRules.filter(r => r.id !== id));
+    const updated = routingRules.filter(r => r.id !== id);
+    setRoutingRules(updated);
+    localStorage.setItem('trolycvp_routing_rules', JSON.stringify(updated));
+    deleteDoc(doc(db, 'routing_rules', id)).catch(err => console.warn("Firestore delete rule error:", err));
   };
 
   const toggleRule = (id: string) => {
@@ -432,6 +754,21 @@ export default function Admin() {
         </button>
 
         <button
+          onClick={() => setActiveTab('brain')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            activeTab === 'brain'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 ring-1 ring-white/20'
+              : 'text-indigo-900 font-black bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80'
+          }`}
+        >
+          <BrainCircuit className="w-4 h-4 text-indigo-600 animate-pulse" />
+          <span>Bộ Não AI Google Drive</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-indigo-200 text-indigo-950 text-[10px] font-black">
+            _BO_NAO_AI.json
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('routing')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === 'routing'
@@ -441,6 +778,21 @@ export default function Admin() {
         >
           <FolderGit2 className="w-4 h-4" />
           <span>Quy chuẩn Phân luồng ({routingRules.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('learning')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            activeTab === 'learning'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'text-emerald-800 font-extrabold bg-emerald-50/90 hover:bg-emerald-100/90 border border-emerald-300/80'
+          }`}
+        >
+          <BrainCircuit className="w-4 h-4 text-emerald-600" />
+          <span>Tri thức AI & Máy học ({learnedRules.length})</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-950 text-[10px] font-black">
+            AI Auto-Learn
+          </span>
         </button>
 
         <button
@@ -645,10 +997,198 @@ export default function Admin() {
         </div>
       )}
 
+      {/* TAB: GOOGLE DRIVE AI BRAIN STORAGE ENGINE */}
+      {activeTab === 'brain' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Hero Banner for AI Storage Brain */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-blue-950 p-6 md:p-8 rounded-3xl text-white border border-indigo-500/30 shadow-xl space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
+                  <BrainCircuit className="w-8 h-8 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-black text-white uppercase tracking-wide">
+                      Bộ Não AI Tham Mưu & Tri Thức Máy Học trên Google Drive
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 text-[10px] font-extrabold border border-indigo-400/40">
+                      Tệp: _BO_NAO_THAM_MUU_AI.json
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-100/80 max-w-2xl leading-relaxed">
+                    Trung tâm lưu trữ tri thức tập trung. Đóng gói quy tắc học máy, ma trận thẩm quyền, danh mục cơ quan và lịch sử chỉ đạo thành tệp tri thức thông minh trên Google Drive cơ quan. giúp Trợ lý AI liên tục thông minh hơn!
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleExportBrainToDrive}
+                  disabled={isSyncingBrain}
+                  className="px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <Upload className={`w-4 h-4 ${isSyncingBrain ? 'animate-bounce' : ''}`} />
+                  <span>{isSyncingBrain ? 'Đang tải lên Drive...' : 'Sao lưu Bộ Não lên Drive'}</span>
+                </button>
+
+                <button
+                  onClick={handleImportBrainFromDrive}
+                  disabled={isImportingBrain}
+                  className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <Download className={`w-4 h-4 ${isImportingBrain ? 'animate-bounce' : ''}`} />
+                  <span>{isImportingBrain ? 'Đang nạp từ Drive...' : 'Nạp Tri thức từ Drive'}</span>
+                </button>
+
+                <button
+                  onClick={handleSynthesizeBrainKnowledge}
+                  disabled={isSynthesizingBrain}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <Sparkles className={`w-4 h-4 ${isSynthesizingBrain ? 'animate-spin' : ''}`} />
+                  <span>{isSynthesizingBrain ? 'Gemini đang phân tích...' : 'Gemini Tự học Tri thức'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Knowledge Blueprint Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-indigo-500/20 relative z-10">
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-indigo-300 uppercase">Quy tắc AI Đã học</div>
+                <div className="text-xl font-black text-white">{learnedRules.length} quy tắc</div>
+                <div className="text-[10px] text-indigo-200/60">Tự động học từ Lãnh đạo</div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-indigo-300 uppercase">Danh mục Đơn vị</div>
+                <div className="text-xl font-black text-white">{departments.length} phòng/ban</div>
+                <div className="text-[10px] text-indigo-200/60">Cơ cấu ban ngành chuẩn</div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-indigo-300 uppercase">Ma trận Thẩm quyền</div>
+                <div className="text-xl font-black text-white">{routingRules.length} cấp chỉ đạo</div>
+                <div className="text-[10px] text-indigo-200/60">Phân luồng thẩm quyền</div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <div className="text-[10px] font-bold text-indigo-300 uppercase">Căn cứ Pháp lý</div>
+                <div className="text-xl font-black text-white">{legalBasis.length} nghị quyết</div>
+                <div className="text-[10px] text-indigo-200/60">Văn bản quy phạm</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sync Status Feedback Banner */}
+          {brainSyncStatus && (
+            <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs font-bold text-indigo-900 flex items-center justify-between gap-3 animate-in fade-in shadow-xs">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-indigo-600 flex-shrink-0 animate-pulse" />
+                <span>{brainSyncStatus}</span>
+              </div>
+              {brainDriveInfo?.driveUrl && (
+                <a
+                  href={brainDriveInfo.driveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-extrabold flex items-center gap-1 hover:bg-indigo-700 transition-colors"
+                >
+                  <span>Mở tệp trên Drive</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Live Inspection Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Card 1: Machine Learning Rules in Brain */}
+            <div className="bg-white/95 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit className="w-5 h-5 text-emerald-600" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Quy tắc AI Đã học (_BO_NAO_THAM_MUU_AI.json)
+                  </h3>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                  {learnedRules.length} quy tắc
+                </span>
+              </div>
+
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {learnedRules.map((rule, idx) => (
+                  <div key={rule.id || idx} className="p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200/60 transition-all space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
+                        Từ khóa: [{rule.keywordTrigger}]
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">Tin cậy: {rule.confidence}%</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-800">
+                      Giao: <span className="text-blue-700">{rule.suggestedLeadDept}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Đề xuất: {rule.suggestedAction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Card 2: Department & Authority Directory */}
+            <div className="bg-white/95 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Từ điển Cơ quan & Phân công Thẩm quyền
+                  </h3>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold">
+                  {departments.length} đơn vị
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {departments.map((dept) => (
+                  <div key={dept.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-900">{dept.name}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[10px] font-bold">{dept.code}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">Người đứng đầu: <span className="font-medium text-slate-700">{dept.headPerson}</span></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dept.category === 'CAP_UY' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {dept.category === 'CAP_UY' ? 'Cấp ủy' : 'Chính quyền'}
+                      </span>
+                      <button
+                        onClick={() => {
+                          handleStartEditDepartment(dept);
+                          setActiveTab('departments');
+                        }}
+                        className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                        title="Chỉnh sửa đơn vị này"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Sửa</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* TAB 1: OVERVIEW & AUDIT */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-blue-100 shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -744,7 +1284,214 @@ export default function Admin() {
         </div>
       )}
 
-      {/* TAB 2: ROUTING RULES */}
+      {/* TAB: MACHINE LEARNING & AI ADAPTIVE RULES */}
+      {activeTab === 'learning' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="w-5 h-5 text-emerald-600" />
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  Tri thức Máy học & Quy tắc AI Tự học (Adaptive Learning Rules)
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Danh sách bộ quy tắc phân luồng đã được AI tự động ghi nhớ từ các phản hồi & điều chỉnh trực tiếp của Lãnh đạo/Chuyên viên.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadLearnedRules}
+                disabled={isLoadingLearned}
+                className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isLoadingLearned ? 'animate-spin' : ''}`} />
+                <span>Làm mới ({learnedRules.length})</span>
+              </button>
+
+              <button
+                onClick={() => setShowAddLearnedRule(!showAddLearnedRule)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Quy tắc Máy học</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Add New Learned Rule Form */}
+          {showAddLearnedRule && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newLearnedRule.keywordTrigger.trim()) return;
+                try {
+                  await saveLearnedAdjustmentRule({
+                    keywordTrigger: newLearnedRule.keywordTrigger,
+                    suggestedLeadDept: newLearnedRule.suggestedLeadDept,
+                    suggestedAction: newLearnedRule.suggestedAction || 'Giao cơ quan chủ trì tham mưu',
+                    learnedAt: new Date().toLocaleDateString('vi-VN'),
+                    confidence: 99,
+                    useCount: 1,
+                    isActive: true,
+                    notes: newLearnedRule.notes || 'Thêm thủ công bởi Quản trị viên'
+                  });
+                  setNewLearnedRule({ keywordTrigger: '', suggestedLeadDept: 'Văn phòng Cấp ủy', suggestedAction: '', notes: '' });
+                  setShowAddLearnedRule(false);
+                  loadLearnedRules();
+                } catch (err) {
+                  console.error("Error saving manual learned rule:", err);
+                }
+              }}
+              className="bg-emerald-50/60 border border-emerald-200 p-5 rounded-3xl space-y-4 shadow-sm animate-in fade-in"
+            >
+              <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-900 border-b border-emerald-200/80 pb-2">
+                <BrainCircuit className="w-4 h-4 text-emerald-600" />
+                <span>Thêm Quy tắc Phân luồng Máy học cho AI</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Từ khóa Kích hoạt (Keyword Trigger) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newLearnedRule.keywordTrigger}
+                    onChange={(e) => setNewLearnedRule({ ...newLearnedRule, keywordTrigger: e.target.value })}
+                    placeholder="VD: trật tự đô thị, lấn chiếm vỉa hè, cấp phép xây dựng..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Cơ quan / Đơn vị Chủ trì Giao xử lý *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newLearnedRule.suggestedLeadDept}
+                    onChange={(e) => setNewLearnedRule({ ...newLearnedRule, suggestedLeadDept: e.target.value })}
+                    placeholder="VD: Đội Trật tự Đô thị & Công an Phường"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 font-semibold text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Hướng Phân luồng / Hành động Đề xuất
+                  </label>
+                  <input
+                    type="text"
+                    value={newLearnedRule.suggestedAction}
+                    onChange={(e) => setNewLearnedRule({ ...newLearnedRule, suggestedAction: e.target.value })}
+                    placeholder="VD: Giao Đội Trật tự Đô thị ra quân kiểm tra dứt điểm..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium text-emerald-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Ghi chú nguồn gốc / Lý do điều chỉnh
+                  </label>
+                  <input
+                    type="text"
+                    value={newLearnedRule.notes}
+                    onChange={(e) => setNewLearnedRule({ ...newLearnedRule, notes: e.target.value })}
+                    placeholder="VD: Cập nhật theo kết luận cuộc họp Thường trực Thành ủy..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-emerald-200/80">
+                <button
+                  type="button"
+                  onClick={() => setShowAddLearnedRule(false)}
+                  className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                >
+                  <BrainCircuit className="w-4 h-4" />
+                  <span>Lưu Quy tắc AI</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* List of Learned Rules */}
+          {isLoadingLearned ? (
+            <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-3xl border border-slate-200">
+              Đang tải bộ quy tắc tri thức AI...
+            </div>
+          ) : learnedRules.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-3xl border border-dashed border-slate-300 space-y-2">
+              <BrainCircuit className="w-8 h-8 text-slate-400 mx-auto" />
+              <div className="text-xs font-bold text-slate-700">Chưa có quy tắc học máy nào được lưu</div>
+              <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                Khi Lãnh đạo bấm "Điều chỉnh phương án & Huấn luyện AI" ở trang Chi tiết Văn bản, hệ thống sẽ tự động cập nhật tri thức vào đây.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {learnedRules.map((rule) => (
+                <div key={rule.id} className="bg-white/95 backdrop-blur-md p-5 rounded-3xl border border-emerald-200/80 shadow-2xs hover:border-emerald-400 transition-all space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-950 font-black text-xs border border-emerald-300 flex items-center gap-1">
+                          <BrainCircuit className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>"{rule.keywordTrigger}"</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
+                          Độ tin cậy: {rule.confidence || 98}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-800 font-bold pt-1">
+                        👉 Đơn vị chủ trì: <span className="text-blue-700">{rule.suggestedLeadDept}</span>
+                      </p>
+                      {rule.suggestedAction && (
+                        <p className="text-xs text-slate-600 italic">
+                          Hành động: "{rule.suggestedAction}"
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        if (!rule.id) return;
+                        if (confirm(`Bạn có chắc muốn xóa quy tắc tri thức AI cho từ khóa "${rule.keywordTrigger}"?`)) {
+                          try {
+                            await deleteDoc(doc(db, 'ai_learning_rules', rule.id));
+                            loadLearnedRules();
+                          } catch (err) {
+                            console.error("Error deleting rule:", err);
+                          }
+                        }
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="text-[10px] text-slate-500 pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span>Học ngày: <strong>{rule.learnedAt}</strong></span>
+                    {rule.notes && <span className="truncate max-w-[200px] text-slate-400">{rule.notes}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {activeTab === 'routing' && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -818,9 +1565,132 @@ export default function Admin() {
             </form>
           )}
 
+          {/* Rules List Search Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/80 p-3 rounded-2xl border border-slate-200">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm ma trận thẩm quyền..."
+                value={ruleSearchQuery}
+                onChange={e => setRuleSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap px-2">
+              Hiển thị: {filteredRoutingRules.length} / {routingRules.length} quy chuẩn
+            </span>
+          </div>
+
+          {/* Edit Routing Rule Modal */}
+          {editingRule && (
+            <div className="fixed inset-0 z-50 bg-blue-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <form onSubmit={handleSaveEditedRule} className="bg-white p-6 rounded-3xl border border-blue-200 shadow-2xl max-w-2xl w-full space-y-4 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase tracking-wider">
+                    <Pencil className="w-4 h-4 text-blue-600" />
+                    <span>Chỉnh sửa Quy chuẩn Phân luồng Thẩm quyền</span>
+                  </div>
+                  <button type="button" onClick={() => setEditingRule(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Thẩm quyền chỉ đạo / Xử lý</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingRule.targetAuthority}
+                      onChange={e => setEditingRule({ ...editingRule, targetAuthority: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Đơn vị chủ trì tham mưu đề xuất</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingRule.suggestedLeadDept}
+                      onChange={e => setEditingRule({ ...editingRule, suggestedLeadDept: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Điều kiện / Tiêu chí kích hoạt (AI Keyword Match)</label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={editingRule.criteria}
+                      onChange={e => setEditingRule({ ...editingRule, criteria: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Thời hạn mặc định (Ngày)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      required
+                      value={editingRule.defaultDeadlineDays}
+                      onChange={e => setEditingRule({ ...editingRule, defaultDeadlineDays: Number(e.target.value) })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mức độ khẩn</label>
+                    <select
+                      value={editingRule.urgencyLevel}
+                      onChange={e => setEditingRule({ ...editingRule, urgencyLevel: e.target.value as any })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="BINH_THUONG">Bình thường</option>
+                      <option value="THUONG_KHAN">Thượng khẩn</option>
+                      <option value="HOA_TOC">Hỏa tốc</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingRule.isActive}
+                      onChange={e => setEditingRule({ ...editingRule, isActive: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-slate-700">Kích hoạt quy chuẩn này</span>
+                  </label>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingRule(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+                    >
+                      Lưu Thay Đổi
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          )}
+
           {/* Rules List */}
           <div className="grid grid-cols-1 gap-4">
-            {routingRules.map((rule) => (
+            {filteredRoutingRules.map((rule) => (
               <div key={rule.id} className="bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-all space-y-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
@@ -840,6 +1710,14 @@ export default function Admin() {
 
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => setEditingRule(rule)}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-1 text-[11px] font-bold"
+                      title="Chỉnh sửa quy chuẩn"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      <span>Sửa</span>
+                    </button>
+                    <button
                       onClick={() => toggleRule(rule.id)}
                       className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all ${
                         rule.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
@@ -850,6 +1728,7 @@ export default function Admin() {
                     <button
                       onClick={() => deleteRule(rule.id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                      title="Xóa quy chuẩn"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -950,9 +1829,176 @@ export default function Admin() {
             </form>
           )}
 
+          {/* Departments Search & Filter Toolbar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/80 p-3 rounded-2xl border border-slate-200">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm theo mã, tên đơn vị, người đứng đầu, từ khóa..."
+                value={deptSearchQuery}
+                onChange={e => setDeptSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setDeptCategoryFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  deptCategoryFilter === 'ALL'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Tất cả ({departments.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeptCategoryFilter('CAP_UY')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  deptCategoryFilter === 'CAP_UY'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                Khối Cấp ủy ({departments.filter(d => d.category === 'CAP_UY').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeptCategoryFilter('CHINH_QUYEN')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  deptCategoryFilter === 'CHINH_QUYEN'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                Khối Chính quyền ({departments.filter(d => d.category === 'CHINH_QUYEN').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeptCategoryFilter('DOAN_THE')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  deptCategoryFilter === 'DOAN_THE'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                Khối Đoàn thể ({departments.filter(d => d.category === 'DOAN_THE').length})
+              </button>
+            </div>
+          </div>
+
+          {/* Edit Department Modal */}
+          {editingDept && (
+            <div className="fixed inset-0 z-50 bg-blue-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <form onSubmit={handleSaveEditedDepartment} className="bg-white p-6 rounded-3xl border border-blue-200 shadow-2xl max-w-2xl w-full space-y-4 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase tracking-wider">
+                    <Pencil className="w-4 h-4 text-blue-600" />
+                    <span>Chỉnh sửa Đơn vị / Cơ quan tham mưu</span>
+                  </div>
+                  <button type="button" onClick={() => setEditingDept(null)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mã viết tắt</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingDept.code}
+                      onChange={e => setEditingDept({ ...editingDept, code: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tên đơn vị đầy đủ</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingDept.name}
+                      onChange={e => setEditingDept({ ...editingDept, name: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Khối trực thuộc</label>
+                    <select
+                      value={editingDept.category}
+                      onChange={e => setEditingDept({ ...editingDept, category: e.target.value as any })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="CAP_UY">Khối Cấp ủy / Đảng</option>
+                      <option value="CHINH_QUYEN">Khối Chính quyền / UBND</option>
+                      <option value="DOAN_THE">Khối Đoàn thể / Mặt trận</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Người đứng đầu / Chức danh</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Trưởng ban Tổ chức, Chánh Văn phòng, Giám đốc Sở..."
+                      value={editingDept.headPerson || ''}
+                      onChange={e => setEditingDept({ ...editingDept, headPerson: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Từ khóa nhận diện AI (phân cách bằng dấu phẩy)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="VD: đất đai, bồi thường giải phóng mặt bằng, môi trường, khoáng sản..."
+                    value={editingDeptKeywordsStr}
+                    onChange={e => setEditingDeptKeywordsStr(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Các từ khóa giúp Gemini phân loại và tự động chuyển văn bản đến đơn vị này.</p>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editingDept.isDefaultLead || false}
+                      onChange={e => setEditingDept({ ...editingDept, isDefaultLead: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="text-xs font-bold text-slate-700">Đơn vị chủ trì mặc định</span>
+                  </label>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingDept(null)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+                    >
+                      Cập Nhật Đơn Vị
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {departments.map((dept) => (
-              <div key={dept.id} className="bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-all space-y-2 flex flex-col justify-between">
+            {filteredDepartments.map((dept) => (
+              <div key={dept.id} className="bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-all space-y-3 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="px-2 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-extrabold text-slate-700">
@@ -960,30 +2006,44 @@ export default function Admin() {
                     </span>
                     <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${
                       dept.category === 'CAP_UY' ? 'bg-red-50 text-red-700 border border-red-200' :
-                      dept.category === 'CHINH_QUYEN' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-emerald-50 text-emerald-700'
+                      dept.category === 'CHINH_QUYEN' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     }`}>
                       {dept.category === 'CAP_UY' ? 'CẤP ỦY' : dept.category === 'CHINH_QUYEN' ? 'CHÍNH QUYỀN' : 'ĐOÀN THỂ'}
                     </span>
                   </div>
 
                   <h3 className="text-xs font-black text-slate-900 leading-snug">{dept.name}</h3>
-                  <div className="text-[11px] text-slate-500 pt-1">Người đứng đầu: {dept.headPerson || 'Chánh Văn phòng'}</div>
+                  <div className="text-[11px] text-slate-500 pt-1">Người đứng đầu: <strong className="text-slate-700 font-bold">{dept.headPerson || 'Chánh Văn phòng'}</strong></div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <div className="flex flex-wrap gap-1">
-                    {dept.keywords.slice(0, 2).map((kw, i) => (
-                      <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px]">
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1 max-w-[65%]">
+                    {dept.keywords && dept.keywords.slice(0, 3).map((kw, i) => (
+                      <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">
                         {kw}
                       </span>
                     ))}
+                    {dept.keywords && dept.keywords.length > 3 && (
+                      <span className="text-[9px] font-bold text-slate-400">+{dept.keywords.length - 3}</span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => deleteDepartment(dept.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 rounded"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleStartEditDepartment(dept)}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
+                      title="Chỉnh sửa đơn vị"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Sửa</span>
+                    </button>
+                    <button
+                      onClick={() => deleteDepartment(dept.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa đơn vị"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

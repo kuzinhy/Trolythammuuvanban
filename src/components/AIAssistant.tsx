@@ -103,7 +103,7 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
       {/* Slide-over Drawer Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-50 transition-opacity"
+          className="fixed inset-0 bg-blue-950/50 backdrop-blur-xs z-50 transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -116,7 +116,7 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
         )}
       >
         {/* Drawer Header */}
-        <div className="px-5 py-4 border-b border-blue-900/40 flex items-center justify-between bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white shadow-sm">
+        <div className="px-5 py-4 border-b border-blue-700/60 flex items-center justify-between bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-inner border border-blue-300/30">
               <Sparkles className="w-4 h-4 text-amber-300" />

@@ -148,7 +148,7 @@ export default function Login() {
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full flex justify-center items-center gap-3 rounded-xl bg-slate-900 py-3.5 px-4 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-md hover:shadow-lg active:scale-[0.99] disabled:opacity-60"
+            className="w-full flex justify-center items-center gap-3 rounded-xl bg-blue-600 py-3.5 px-4 text-xs font-bold text-white hover:bg-blue-700 transition-all shadow-md shadow-blue-500/25 hover:shadow-lg active:scale-[0.99] disabled:opacity-60 cursor-pointer"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin text-white" />

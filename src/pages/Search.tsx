@@ -3,11 +3,12 @@ import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
   Search as SearchIcon, Loader2, FileText, ChevronRight, HardDrive, 
-  Sparkles, Filter, ExternalLink, Printer, ShieldAlert, BookOpen, CheckCircle2 
+  Sparkles, Filter, ExternalLink, Printer, ShieldAlert, BookOpen, CheckCircle2, Tag 
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Document } from '../types';
 import DispatchSlip from '../components/DispatchSlip';
+import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 
 interface AISearchResult {
   aiAnswerSummary: string;
@@ -419,6 +420,28 @@ export default function Search() {
                           {doc.issuedDate && <span>Ngày ký: <strong>{doc.issuedDate}</strong></span>}
                           {doc.actionDeadline && <span className="text-blue-700 font-bold">Hạn báo cáo: {doc.actionDeadline}</span>}
                         </div>
+
+                        {/* Document Tags */}
+                        {(() => {
+                          const tags = getDocumentTags(doc);
+                          if (tags.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              {tags.map((t) => {
+                                const style = getTagStyle(t);
+                                return (
+                                  <span
+                                    key={t}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border ${style.bgClass}`}
+                                  >
+                                    <span>{style.icon}</span>
+                                    <span>{t}</span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 

@@ -119,6 +119,9 @@ export interface Document {
   fullContent?: string | null;
   extractedTextKeywords?: string[];
 
+  // Tags & Categorization
+  tags?: string[];
+
   status: 'UPLOADED' | 'ANALYZED' | 'USER_REVIEWED' | 'USER_CONFIRMED' | 'DISPATCHED';
   createdBy?: string;
 }

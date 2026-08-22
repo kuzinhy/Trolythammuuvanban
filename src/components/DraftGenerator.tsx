@@ -55,22 +55,22 @@ export default function DraftGenerator({ document, onClose }: DraftGeneratorProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-blue-950/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 font-sans">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white">
+        <div className="px-6 py-4 border-b border-blue-800 flex items-center justify-between bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-red-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-amber-300" />
             </div>
             <div>
               <h2 className="text-sm font-bold leading-none">Soạn Thảo Dự Thảo Văn Bản Chỉ Đạo / Kết Luận</h2>
-              <p className="text-[11px] text-slate-300 mt-0.5">Tự động hóa theo thể thức Nghị định 30/2020/NĐ-CP</p>
+              <p className="text-[11px] text-blue-200 mt-0.5">Tự động hóa theo thể thức Nghị định 30/2020/NĐ-CP</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -107,7 +107,7 @@ export default function DraftGenerator({ document, onClose }: DraftGeneratorProp
             <button
               onClick={handleCopy}
               disabled={!draftContent || isLoading}
-              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {isCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{isCopied ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép toàn bộ dự thảo'}</span>
@@ -124,11 +124,11 @@ export default function DraftGenerator({ document, onClose }: DraftGeneratorProp
               <p className="text-xs text-slate-400">Đang chuẩn hóa thể thức và nội dung phân công theo quy chế</p>
             </div>
           ) : (
-            <div className="bg-white p-8 rounded-xl shadow-xs border border-slate-200 max-w-3xl mx-auto font-serif">
+            <div className="bg-white p-8 rounded-xl shadow-xs border border-slate-200 max-w-3xl mx-auto font-sans">
               <textarea
                 value={draftContent}
                 onChange={(e) => setDraftContent(e.target.value)}
-                className="w-full h-[520px] p-2 font-serif text-sm leading-relaxed text-slate-900 border-none resize-none focus:outline-none bg-transparent"
+                className="w-full h-[520px] p-2 font-sans text-sm leading-relaxed text-slate-900 border-none resize-none focus:outline-none bg-transparent"
                 placeholder="Nội dung dự thảo..."
               />
             </div>
