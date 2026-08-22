@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bell, AlertTriangle, Clock, CheckCircle2, X, ChevronRight, 
   Sparkles, Filter, ExternalLink, Calendar, Building2, Flame,
-  Check, Volume2, VolumeX
+  Check
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { updateDoc, doc } from 'firebase/firestore';
@@ -32,12 +32,10 @@ interface TaskReminderToastsProps {
   onRefresh?: () => void;
 }
 
-// Utility to parse various Vietnamese and ISO date string formats
 export function parseDateString(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
   const str = dateStr.trim();
 
-  // Try YYYY-MM-DD format
   const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   if (ymdMatch) {
     const year = parseInt(ymdMatch[1], 10);
@@ -47,7 +45,6 @@ export function parseDateString(dateStr: string | null | undefined): Date | null
     if (!isNaN(d.getTime())) return d;
   }
 
-  // Try DD/MM/YYYY or DD-MM-YYYY format
   const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
@@ -57,7 +54,6 @@ export function parseDateString(dateStr: string | null | undefined): Date | null
     if (!isNaN(d.getTime())) return d;
   }
 
-  // Fallback
   const parsed = new Date(str);
   return isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -71,14 +67,31 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
   const [toastFeedback, setToastFeedback] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Compute upcoming reminders
+  const prevTasksCountRef = useRef(tasks.length);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      prevTasksCountRef.current = tasks.length;
+      return;
+    }
+
+    if (tasks.length > prevTasksCountRef.current) {
+      const latestTask = tasks[0];
+      if (latestTask) {
+        setToastFeedback(`🔔 Có nhiệm vụ mới được giao: "${latestTask.title.substring(0, 40)}..."`);
+        setTimeout(() => setToastFeedback(null), 6000);
+      }
+    }
+    prevTasksCountRef.current = tasks.length;
+  }, [tasks]);
+
   const reminders = useMemo(() => {
     const items: ReminderItem[] = [];
     const now = new Date();
-    // Normalize today to midnight for fair day comparison
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // 1. Process tasks that are not completed
     for (const task of tasks) {
       if (task.status === 'COMPLETED' || (task.id && completedIds.has(task.id))) continue;
       if (!task.dueDate) continue;
@@ -117,9 +130,9 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
       }
     }
 
-    // 2. Process documents with action deadlines if not already covered
     for (const docItem of documents) {
       if (!docItem.actionDeadline) continue;
+      if (docItem.reminderEnabled === false) continue;
       const dueDateObj = parseDateString(docItem.actionDeadline);
       if (!dueDateObj) continue;
 
@@ -127,18 +140,19 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
       const diffTime = docDateAtMidnight.getTime() - today.getTime();
       const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
 
+      const thresholdDays = docItem.reminderDaysBefore ?? 3;
+
       let urgency: DeadlineUrgency | null = null;
       if (diffDays < 0) {
         urgency = 'OVERDUE';
       } else if (diffDays === 0) {
         urgency = 'DUE_TODAY';
-      } else if (diffDays <= 2) {
+      } else if (diffDays <= thresholdDays) {
         urgency = 'DUE_SOON';
       }
 
       if (urgency) {
         const id = `doc-${docItem.id}`;
-        // Avoid duplicate if task already linked to this doc
         if (!items.some(it => it.sourceDocId === docItem.id)) {
           items.push({
             id,
@@ -156,7 +170,6 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
       }
     }
 
-    // Sort by urgency: OVERDUE first, then DUE_TODAY, then DUE_SOON, then earliest date
     return items.sort((a, b) => {
       const order = { OVERDUE: 0, DUE_TODAY: 1, DUE_SOON: 2 };
       if (order[a.urgency] !== order[b.urgency]) {
@@ -166,18 +179,15 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
     });
   }, [tasks, documents, completedIds]);
 
-  // Active reminders excluding dismissed
   const activeReminders = useMemo(() => {
     return reminders.filter(r => !dismissedIds.has(r.id));
   }, [reminders, dismissedIds]);
 
-  // Filtered active reminders
   const filteredReminders = useMemo(() => {
     if (filterUrgency === 'ALL') return activeReminders;
     return activeReminders.filter(r => r.urgency === filterUrgency);
   }, [activeReminders, filterUrgency]);
 
-  // Counts
   const counts = useMemo(() => {
     let overdue = 0;
     let dueToday = 0;
@@ -201,7 +211,6 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
 
   const handleQuickCompleteTask = async (item: ReminderItem) => {
     if (item.type !== 'TASK' || !item.id || item.id.startsWith('task-')) {
-      // If doc or non-firestore id, navigate to tasks or doc page
       if (item.sourceDocId) {
         navigate(`/documents/${item.sourceDocId}`);
       } else {
@@ -227,7 +236,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
   };
 
   if (activeReminders.length === 0 && !toastFeedback) {
-    return null; // No upcoming deadlines to notify
+    return null;
   }
 
   return (
@@ -239,36 +248,34 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-20 right-6 z-50 bg-emerald-900 text-emerald-100 border border-emerald-500/50 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-bold backdrop-blur-md"
+            className="fixed top-20 right-6 z-50 bg-slate-900 text-white border border-slate-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 text-xs font-semibold"
           >
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 animate-bounce" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             <span>{toastFeedback}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Floating Bottom-Right Toast Reminders Widget */}
-      <div className="fixed bottom-5 right-5 z-40 max-w-md w-full px-2 sm:px-0 pointer-events-none">
+      {/* Modern Flat Floating Toast Reminders Widget */}
+      <div className="fixed bottom-5 right-5 z-40 max-w-sm w-full px-2 sm:px-0 pointer-events-none">
         <div className="pointer-events-auto space-y-3">
-          
-          {/* Main Container Card */}
           <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.92 }}
+            initial={{ opacity: 0, y: 30, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="bg-gradient-to-b from-blue-950 to-indigo-950 text-slate-100 rounded-3xl border border-blue-700/80 shadow-2xl backdrop-blur-xl overflow-hidden ring-1 ring-white/10"
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="bg-white text-slate-900 rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden"
           >
             {/* Header */}
-            <div className="p-4 bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 border-b border-blue-700/80 flex items-center justify-between gap-3">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="relative">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-lg ${
-                    counts.overdue > 0 ? 'bg-red-600 animate-pulse ring-2 ring-red-400/40' : 'bg-blue-600'
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
+                    counts.overdue > 0 ? 'bg-red-600' : 'bg-blue-600'
                   }`}>
                     <Bell className="w-4 h-4" />
                   </div>
                   {counts.total > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black rounded-full h-5 min-w-5 px-1 flex items-center justify-center border-2 border-blue-950 shadow-md">
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
                       {counts.total}
                     </span>
                   )}
@@ -276,15 +283,13 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
 
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-white">Nhắc Nhở Hạn Xử Lý</h3>
-                    <span className="px-1.5 py-0.2 bg-amber-400/20 text-amber-300 text-[9px] font-extrabold rounded border border-amber-400/30">
-                      LIVE
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-900">Nhắc Nhở Deadline</h3>
+                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded">
+                      Trực tuyến
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    {counts.overdue > 0 
-                      ? `⚠️ Có ${counts.overdue} nhiệm vụ đã quá hạn!` 
-                      : `Phát hiện ${counts.total} công việc cần chú ý`}
+                  <p className="text-[10px] text-slate-500 font-normal">
+                    {counts.overdue > 0 ? `${counts.overdue} việc đã quá hạn` : `${counts.total} công việc cần lưu ý`}
                   </p>
                 </div>
               </div>
@@ -292,30 +297,29 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setIsMinimized(!isMinimized)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors text-xs font-bold"
-                  title={isMinimized ? "Phóng to" : "Thu gọn"}
+                  className="px-2 py-1 text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-200/60 transition-colors text-xs font-medium"
                 >
                   {isMinimized ? "Hiện" : "Ẩn"}
                 </button>
                 <button
                   onClick={handleDismissAll}
-                  className="p-1.5 text-slate-400 hover:text-red-300 rounded-lg hover:bg-slate-800 transition-colors"
-                  title="Đóng tất cả thông báo"
+                  className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 transition-colors"
+                  title="Đóng tất cả"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Expanded Toast Body */}
+            {/* Body */}
             {!isMinimized && (
-              <div className="p-3 space-y-3">
-                {/* Filter Selector Tabs */}
-                <div className="flex items-center justify-between gap-1 bg-blue-900/80 p-1 rounded-xl border border-blue-700/80 text-[10px] font-bold">
+              <div className="p-3 space-y-2.5">
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-[10px] font-semibold text-slate-600">
                   <button
                     onClick={() => setFilterUrgency('ALL')}
-                    className={`flex-1 py-1 px-2 rounded-lg transition-all ${
-                      filterUrgency === 'ALL' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
+                    className={`flex-1 py-1 px-2 rounded transition-all ${
+                      filterUrgency === 'ALL' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'hover:text-slate-900'
                     }`}
                   >
                     Tất cả ({counts.total})
@@ -323,19 +327,18 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
                   {counts.overdue > 0 && (
                     <button
                       onClick={() => setFilterUrgency('OVERDUE')}
-                      className={`py-1 px-2 rounded-lg transition-all flex items-center justify-center gap-1 ${
-                        filterUrgency === 'OVERDUE' ? 'bg-red-600 text-white shadow-xs' : 'text-red-400 hover:text-red-300'
+                      className={`py-1 px-2 rounded transition-all ${
+                        filterUrgency === 'OVERDUE' ? 'bg-red-600 text-white shadow-2xs font-bold' : 'text-red-600 hover:text-red-700'
                       }`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping"></span>
                       Quá hạn ({counts.overdue})
                     </button>
                   )}
                   {counts.dueToday > 0 && (
                     <button
                       onClick={() => setFilterUrgency('DUE_TODAY')}
-                      className={`py-1 px-2 rounded-lg transition-all ${
-                        filterUrgency === 'DUE_TODAY' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-400 hover:text-amber-300'
+                      className={`py-1 px-2 rounded transition-all ${
+                        filterUrgency === 'DUE_TODAY' ? 'bg-amber-600 text-white shadow-2xs font-bold' : 'text-amber-700 hover:text-amber-800'
                       }`}
                     >
                       Hôm nay ({counts.dueToday})
@@ -344,8 +347,8 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
                   {counts.dueSoon > 0 && (
                     <button
                       onClick={() => setFilterUrgency('DUE_SOON')}
-                      className={`py-1 px-2 rounded-lg transition-all ${
-                        filterUrgency === 'DUE_SOON' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-400 hover:text-blue-300'
+                      className={`py-1 px-2 rounded transition-all ${
+                        filterUrgency === 'DUE_SOON' ? 'bg-blue-600 text-white shadow-2xs font-bold' : 'text-blue-600 hover:text-blue-700'
                       }`}
                     >
                       Sắp tới ({counts.dueSoon})
@@ -354,111 +357,78 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
                 </div>
 
                 {/* Reminder Cards List */}
-                <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1">
                   <AnimatePresence>
                     {filteredReminders.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-500 italic">
-                        Không có nhắc nhở nào theo bộ lọc đã chọn.
+                      <div className="py-6 text-center text-xs text-slate-400 italic">
+                        Không có nhắc nhở nào theo bộ lọc.
                       </div>
                     ) : (
                       filteredReminders.map((item) => {
                         const isOverdue = item.urgency === 'OVERDUE';
                         const isToday = item.urgency === 'DUE_TODAY';
 
-                        const cardBg = isOverdue
-                          ? 'bg-red-950/40 border-red-800/60 hover:border-red-600/80'
+                        const badgeClass = isOverdue
+                          ? 'bg-red-50 text-red-700 border border-red-200'
                           : isToday
-                            ? 'bg-amber-950/30 border-amber-800/60 hover:border-amber-600/80'
-                            : 'bg-slate-950/50 border-slate-800 hover:border-slate-700';
-
-                        const badgeBg = isOverdue
-                          ? 'bg-red-500/20 text-red-300 border-red-500/30'
-                          : isToday
-                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                            : 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200';
 
                         return (
                           <motion.div
                             key={item.id}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20, height: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className={`p-3 rounded-2xl border transition-all space-y-2 relative group ${cardBg}`}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition-all space-y-1.5"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 ${badgeBg}`}>
-                                  {isOverdue ? (
-                                    <>
-                                      <AlertTriangle className="w-2.5 h-2.5 text-red-400 animate-bounce" />
-                                      <span>Quá hạn {Math.abs(item.daysDiff)} ngày</span>
-                                    </>
-                                  ) : isToday ? (
-                                    <>
-                                      <Flame className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
-                                      <span>Đến hạn Hôm Nay</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Clock className="w-2.5 h-2.5 text-blue-400" />
-                                      <span>Còn {item.daysDiff} ngày</span>
-                                    </>
-                                  )}
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass}`}>
+                                  {isOverdue ? `Quá hạn ${Math.abs(item.daysDiff)} ngày` : isToday ? 'Đến hạn Hôm Nay' : `Còn ${item.daysDiff} ngày`}
                                 </span>
 
                                 {item.docNumber && (
-                                  <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                                  <span className="text-[9px] font-mono text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
                                     {item.docNumber}
-                                  </span>
-                                )}
-
-                                {item.assignedDept && (
-                                  <span className="text-[10px] text-slate-300 font-medium flex items-center gap-1">
-                                    <Building2 className="w-2.5 h-2.5 text-slate-400" />
-                                    <span>{item.assignedDept}</span>
                                   </span>
                                 )}
                               </div>
 
                               <button
                                 onClick={() => handleDismiss(item.id)}
-                                className="text-slate-500 hover:text-slate-300 p-1 rounded-md hover:bg-slate-800 transition-colors flex-shrink-0"
-                                title="Đóng nhắc nhở này"
+                                className="text-slate-400 hover:text-slate-700 p-0.5 rounded transition-colors"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
 
-                            {/* Title */}
-                            <h4 className="text-xs font-bold text-slate-100 line-clamp-2 leading-snug">
+                            <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
                               {item.title}
                             </h4>
 
-                            {/* Actions bar */}
-                            <div className="pt-1.5 flex items-center justify-between border-t border-slate-800/60 text-[10px]">
-                              <span className="text-slate-400 font-medium flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-slate-500" />
-                                Hạn: <strong className="text-slate-200">{item.dueDateStr}</strong>
+                            <div className="pt-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-200/60">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-slate-400" />
+                                Hạn: <strong className="text-slate-800">{item.dueDateStr}</strong>
                               </span>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
                                 {item.type === 'TASK' && (
                                   <button
                                     onClick={() => handleQuickCompleteTask(item)}
                                     disabled={completingId === item.id}
-                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-all flex items-center gap-1 active:scale-95 disabled:opacity-50"
-                                    title="Đánh dấu đã hoàn thành nhiệm vụ này ngay lập tức"
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded transition-all flex items-center gap-1 text-[10px]"
                                   >
-                                    <Check className="w-3 h-3" />
-                                    <span>Hoàn thành</span>
+                                    <Check className="w-2.5 h-2.5" />
+                                    <span>Xong</span>
                                   </button>
                                 )}
 
                                 {item.sourceDocId ? (
                                   <Link
                                     to={`/documents/${item.sourceDocId}`}
-                                    className="px-2 py-1 bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white font-bold rounded-lg transition-all flex items-center gap-1 border border-blue-500/30"
+                                    className="px-2 py-1 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-bold rounded transition-all flex items-center gap-1 text-[10px]"
                                   >
                                     <span>Chi tiết</span>
                                     <ExternalLink className="w-2.5 h-2.5" />
@@ -466,9 +436,9 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
                                 ) : (
                                   <Link
                                     to="/tasks"
-                                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg transition-all flex items-center gap-1"
+                                    className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded transition-all flex items-center gap-1 text-[10px]"
                                   >
-                                    <span>Xem bảng Kanban</span>
+                                    <span>Xem</span>
                                     <ChevronRight className="w-2.5 h-2.5" />
                                   </Link>
                                 )}
@@ -481,14 +451,14 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
                   </AnimatePresence>
                 </div>
 
-                {/* Footer link to full tasks board */}
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 font-medium">Cập nhật tự động từ hệ thống</span>
+                {/* Footer */}
+                <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">Tự động nhắc nhở</span>
                   <Link
                     to="/tasks"
-                    className="font-black text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    className="font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors text-xs"
                   >
-                    <span>Mở Bảng Đôn Đốc Nhiệm Vụ</span>
+                    <span>Quản lý nhiệm vụ</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -501,10 +471,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
   );
 }
 
-// Summary Alert Banner Component for insertion directly into Dashboard header/top
 export function TaskReminderAlertBanner({ tasks, documents = [] }: { tasks: Task[]; documents?: Document[] }) {
-  const navigate = useNavigate();
-
   const reminderCounts = useMemo(() => {
     let overdue = 0;
     let dueToday = 0;
@@ -535,47 +502,35 @@ export function TaskReminderAlertBanner({ tasks, documents = [] }: { tasks: Task
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md ${
+      className={`rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
         reminderCounts.overdue > 0
-          ? 'bg-gradient-to-r from-red-900/90 via-slate-900 to-red-950 text-white border-red-500/40 ring-1 ring-red-500/30'
-          : 'bg-gradient-to-r from-amber-900/90 via-slate-900 to-amber-950 text-white border-amber-500/40'
+          ? 'bg-red-50 text-red-900 border-red-200'
+          : 'bg-amber-50 text-amber-900 border-amber-200'
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white shadow-md ${
-          reminderCounts.overdue > 0 ? 'bg-red-600 animate-pulse' : 'bg-amber-600'
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white ${
+          reminderCounts.overdue > 0 ? 'bg-red-600' : 'bg-amber-600'
         }`}>
-          <AlertTriangle className="w-5 h-5" />
+          <AlertTriangle className="w-4 h-4" />
         </div>
 
         <div>
           <div className="flex items-center gap-2">
-            <h4 className="text-xs font-black uppercase tracking-wider text-white">
-              {reminderCounts.overdue > 0 ? 'Cảnh Báo Nóng: Nhiệm Vụ Quá Hạn' : 'Thông Báo: Nhiệm Vụ Sắp Đến Hạn'}
+            <h4 className="text-xs font-black uppercase tracking-wide">
+              {reminderCounts.overdue > 0 ? 'Cảnh báo: Có nhiệm vụ quá hạn xử lý' : 'Nhắc nhở: Nhiệm vụ sắp đến hạn'}
             </h4>
             {reminderCounts.overdue > 0 && (
-              <span className="px-2 py-0.2 bg-red-500 text-white text-[9px] font-black rounded uppercase animate-bounce">
-                CẤP BÁCH
+              <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded">
+                QUÁ HẠN
               </span>
             )}
           </div>
 
-          <p className="text-xs text-slate-200 mt-0.5 leading-snug">
-            {reminderCounts.overdue > 0 && (
-              <strong className="text-red-300 font-extrabold mr-1.5">
-                • {reminderCounts.overdue} nhiệm vụ đã quá hạn xử lý!
-              </strong>
-            )}
-            {reminderCounts.dueToday > 0 && (
-              <span className="text-amber-300 font-bold mr-1.5">
-                • {reminderCounts.dueToday} nhiệm vụ đến hạn hôm nay.
-              </span>
-            )}
-            {reminderCounts.dueSoon > 0 && (
-              <span className="text-blue-200 font-medium">
-                • {reminderCounts.dueSoon} nhiệm vụ sẽ đến hạn trong 3 ngày tới.
-              </span>
-            )}
+          <p className="text-xs text-slate-700 mt-0.5">
+            {reminderCounts.overdue > 0 && <strong className="text-red-700 mr-1.5">• {reminderCounts.overdue} quá hạn.</strong>}
+            {reminderCounts.dueToday > 0 && <span className="text-amber-800 font-semibold mr-1.5">• {reminderCounts.dueToday} đến hạn hôm nay.</span>}
+            {reminderCounts.dueSoon > 0 && <span className="text-slate-600">• {reminderCounts.dueSoon} đến hạn trong 3 ngày tới.</span>}
           </p>
         </div>
       </div>
@@ -583,10 +538,10 @@ export function TaskReminderAlertBanner({ tasks, documents = [] }: { tasks: Task
       <div className="flex items-center gap-2 self-end sm:self-center">
         <Link
           to="/tasks"
-          className="px-3.5 py-2 bg-white text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+          className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
         >
-          <span>Xử lý ngay</span>
-          <ChevronRight className="w-3.5 h-3.5 text-blue-600" />
+          <span>Xem & Xử lý</span>
+          <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
     </motion.div>

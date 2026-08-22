@@ -104,6 +104,9 @@ export interface Document {
   coordinatingDepartments: string[]; // Đơn vị phối hợp
   advisoryOpinion: string | null; // Ý kiến tham mưu chi tiết trình lãnh đạo (Dự thảo phân luồng, nội dung cần chỉ đạo)
   actionDeadline: string | null; // Hạn chót xử lý / Báo cáo
+  reminderEnabled?: boolean;
+  reminderDaysBefore?: number;
+  reminderNotes?: string;
   keyDirectives: string[]; // Các chỉ đạo cốt lõi / yêu cầu trọng tâm
   legalBasis: string[]; // Căn cứ pháp lý, văn bản liên quan được viện dẫn
   suggestedDraftType: string | null; // Loại văn bản chỉ đạo đề xuất ban hành (Thông báo kết luận, Công văn chỉ đạo, Kế hoạch thực hiện)
@@ -121,9 +124,21 @@ export interface Document {
 
   // Tags & Categorization
   tags?: string[];
+  assignedDeputyChief?: string | null; // Giao cho Phó Chánh VP nào
+  processingResult?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | string | null; // Kết quả: xong chưa, hay đang thực hiện
 
   status: 'UPLOADED' | 'ANALYZED' | 'USER_REVIEWED' | 'USER_CONFIRMED' | 'DISPATCHED';
   createdBy?: string;
+}
+
+export interface AssignedOfficer {
+  id: string;
+  fullName: string;
+  roleType: 'DEPUTY_CHIEF' | 'SPECIALIST'; // Phó Chánh VP or Chuyên viên
+  department: string;
+  phone?: string;
+  email?: string;
+  status: 'ACTIVE' | 'BUSY' | 'ON_LEAVE';
 }
 
 export interface Task {

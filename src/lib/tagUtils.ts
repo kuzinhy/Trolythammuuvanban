@@ -157,42 +157,22 @@ export function getDocumentTags(docItem: Partial<Document>): string[] {
 export function getTagStyle(tag: string): { bgClass: string; icon: string } {
   const normalized = tag.toLowerCase();
 
-  if (normalized.includes('báo cáo')) {
-    return { bgClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', icon: '📋' };
-  }
-  if (normalized.includes('kiểm tra') || normalized.includes('giám sát')) {
-    return { bgClass: 'bg-red-100 text-red-900 border-red-300 font-bold', icon: '🔍' };
-  }
-  if (normalized.includes('kế hoạch')) {
-    return { bgClass: 'bg-blue-100 text-blue-900 border-blue-300 font-bold', icon: '📅' };
-  }
-  if (normalized.includes('nghị quyết')) {
-    return { bgClass: 'bg-purple-100 text-purple-900 border-purple-300 font-bold', icon: '🏛️' };
-  }
-  if (normalized.includes('chỉ thị')) {
-    return { bgClass: 'bg-rose-100 text-rose-900 border-rose-300 font-bold', icon: '⚡' };
-  }
-  if (normalized.includes('quyết định')) {
-    return { bgClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold', icon: '⚖️' };
-  }
-  if (normalized.includes('tờ trình')) {
-    return { bgClass: 'bg-indigo-100 text-indigo-900 border-indigo-300 font-bold', icon: '📄' };
-  }
-  if (normalized.includes('tài chính') || normalized.includes('ngân sách')) {
-    return { bgClass: 'bg-teal-100 text-teal-900 border-teal-300 font-bold', icon: '💰' };
-  }
-  if (normalized.includes('cán bộ') || normalized.includes('tổ chức')) {
-    return { bgClass: 'bg-sky-100 text-sky-900 border-sky-300 font-bold', icon: '👥' };
-  }
-  if (normalized.includes('đô thị') || normalized.includes('môi trường')) {
-    return { bgClass: 'bg-green-100 text-green-900 border-green-300 font-bold', icon: '🌱' };
-  }
-  if (normalized.includes('an ninh') || normalized.includes('quốc phòng')) {
-    return { bgClass: 'bg-orange-100 text-orange-900 border-orange-300 font-bold', icon: '🛡️' };
-  }
-  if (normalized.includes('chuyển đổi số')) {
-    return { bgClass: 'bg-cyan-100 text-cyan-900 border-cyan-300 font-bold', icon: '💻' };
-  }
+  let icon = '•';
+  if (normalized.includes('báo cáo')) icon = '📋';
+  else if (normalized.includes('kiểm tra') || normalized.includes('giám sát')) icon = '🔍';
+  else if (normalized.includes('kế hoạch')) icon = '📅';
+  else if (normalized.includes('nghị quyết')) icon = '🏛️';
+  else if (normalized.includes('chỉ thị')) icon = '⚡';
+  else if (normalized.includes('quyết định')) icon = '⚖️';
+  else if (normalized.includes('tờ trình')) icon = '📄';
+  else if (normalized.includes('tài chính') || normalized.includes('ngân sách')) icon = '💰';
+  else if (normalized.includes('cán bộ') || normalized.includes('tổ chức')) icon = '👥';
+  else if (normalized.includes('đô thị') || normalized.includes('môi trường')) icon = '🌱';
+  else if (normalized.includes('an ninh') || normalized.includes('quốc phòng')) icon = '🛡️';
+  else if (normalized.includes('chuyển đổi số')) icon = '💻';
 
-  return { bgClass: 'bg-slate-100 text-slate-800 border-slate-300 font-semibold', icon: '🏷️' };
+  return { 
+    bgClass: 'bg-slate-100 text-slate-700 border border-slate-200/80 font-medium hover:bg-slate-200 transition-colors', 
+    icon 
+  };
 }

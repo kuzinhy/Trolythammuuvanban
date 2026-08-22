@@ -8,7 +8,7 @@ import {
   Pencil, Edit3, X, Filter
 } from 'lucide-react';
 import { useAuthStore, isSystemAdmin } from '../store/authStore';
-import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig } from '../types';
+import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig, AssignedOfficer } from '../types';
 import { 
   db, collection, getDocs, doc, setDoc, deleteDoc, writeBatch, serverTimestamp,
   TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess,
@@ -20,6 +20,16 @@ import {
 import { 
   getActiveLearningRules, saveLearnedAdjustmentRule, LearningRule 
 } from '../lib/learningEngine';
+
+// Initial default configuration datasets tailored for Party & Local Government administration
+const INITIAL_OFFICERS: AssignedOfficer[] = [
+  { id: 'off-1', fullName: 'Đ/c Nguyễn Văn Hùng', roleType: 'DEPUTY_CHIEF', department: 'Phòng Tổng hợp Cấp ủy', phone: '0912345678', email: 'hungnv@vanphong.gov.vn', status: 'ACTIVE' },
+  { id: 'off-2', fullName: 'Đ/c Lê Thị Minh', roleType: 'DEPUTY_CHIEF', department: 'Phòng Hành chính - Tổ chức', phone: '0913456789', email: 'minhlt@vanphong.gov.vn', status: 'ACTIVE' },
+  { id: 'off-3', fullName: 'Đ/c Trần Quốc Tuấn', roleType: 'DEPUTY_CHIEF', department: 'Phòng Kinh tế - Đô thị', phone: '0914567890', email: 'tuantq@vanphong.gov.vn', status: 'ACTIVE' },
+  { id: 'off-4', fullName: 'Đ/c Hoàng Văn Nam', roleType: 'DEPUTY_CHIEF', department: 'Phòng Nội chính - Tiếp công dân', phone: '0915678901', email: 'namhv@vanphong.gov.vn', status: 'ACTIVE' },
+  { id: 'off-5', fullName: 'Đ/c Trần Thị Mai', roleType: 'SPECIALIST', department: 'Phòng Tổng hợp Cấp ủy', phone: '0981112233', email: 'maitt@vanphong.gov.vn', status: 'ACTIVE' },
+  { id: 'off-6', fullName: 'Đ/c Phạm Văn Minh', roleType: 'SPECIALIST', department: 'Bộ phận Văn thư - Lưu trữ', phone: '0982223344', email: 'minhpv@vanphong.gov.vn', status: 'ACTIVE' },
+];
 
 // Initial default configuration datasets tailored for Party & Local Government administration
 const INITIAL_DEPARTMENTS: DepartmentConfig[] = [
@@ -107,7 +117,7 @@ export default function Admin() {
   const { user } = useAuthStore();
   const isAdmin = isSystemAdmin(user);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'legal' | 'system'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system'>('overview');
   
   const [learnedRules, setLearnedRules] = useState<LearningRule[]>([]);
   const [isLoadingLearned, setIsLoadingLearned] = useState(false);
@@ -175,12 +185,83 @@ export default function Admin() {
   });
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  const [officers] = useState([
+  const [systemUsers] = useState([
     { uid: 'admin-primary', name: 'Nguyễn Huy (Quản trị viên)', email: 'nguyenhuy.thudaumot@gmail.com', role: 'ADMIN', department: 'Văn phòng Cấp ủy', status: 'Đang hoạt động' },
     { uid: 'usr-1', name: 'Chuyên viên Tổng hợp Cấp ủy', email: 'chuyenvien.capuy@vanphong.gov.vn', role: 'OFFICE', department: 'Văn phòng Cấp ủy', status: 'Đang hoạt động' },
     { uid: 'usr-2', name: 'Chuyên viên Văn thư - Lưu trữ', email: 'vanthu@vanphong.gov.vn', role: 'OFFICE', department: 'Bộ phận Văn thư', status: 'Đang hoạt động' },
     { uid: 'usr-3', name: 'Lãnh đạo Phê duyệt', email: 'lanhdao.vp@vanphong.gov.vn', role: 'LEADER', department: 'Lãnh đạo Văn phòng', status: 'Đang hoạt động' },
   ]);
+
+  const [officers, setOfficers] = useState<AssignedOfficer[]>(() => {
+    const saved = localStorage.getItem('trolycvp_officers');
+    return saved ? JSON.parse(saved) : INITIAL_OFFICERS;
+  });
+  const [showAddOfficer, setShowAddOfficer] = useState(false);
+  const [newOfficer, setNewOfficer] = useState({
+    fullName: '',
+    roleType: 'DEPUTY_CHIEF' as 'DEPUTY_CHIEF' | 'SPECIALIST',
+    department: 'Phòng Tổng hợp Cấp ủy',
+    phone: '',
+    email: '',
+    status: 'ACTIVE' as 'ACTIVE' | 'BUSY' | 'ON_LEAVE'
+  });
+  const [editingOfficer, setEditingOfficer] = useState<AssignedOfficer | null>(null);
+  const [officerSearchQuery, setOfficerSearchQuery] = useState('');
+  const [officerRoleFilter, setOfficerRoleFilter] = useState<'ALL' | 'DEPUTY_CHIEF' | 'SPECIALIST'>('ALL');
+
+  const filteredOfficers = officers.filter(officer => {
+    const matchesRole = officerRoleFilter === 'ALL' || officer.roleType === officerRoleFilter;
+    if (!matchesRole) return false;
+    if (!officerSearchQuery.trim()) return true;
+    const q = officerSearchQuery.toLowerCase();
+    return officer.fullName.toLowerCase().includes(q) ||
+           officer.department.toLowerCase().includes(q) ||
+           (officer.phone && officer.phone.includes(q)) ||
+           (officer.email && officer.email.toLowerCase().includes(q));
+  });
+
+  const handleAddOfficer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOfficer.fullName.trim()) return;
+    const officer: AssignedOfficer = {
+      id: `off-${Date.now()}`,
+      fullName: newOfficer.fullName.trim(),
+      roleType: newOfficer.roleType,
+      department: newOfficer.department,
+      phone: newOfficer.phone.trim(),
+      email: newOfficer.email.trim(),
+      status: newOfficer.status
+    };
+    const updated = [...officers, officer];
+    setOfficers(updated);
+    localStorage.setItem('trolycvp_officers', JSON.stringify(updated));
+    setNewOfficer({ fullName: '', roleType: 'DEPUTY_CHIEF', department: 'Phòng Tổng hợp Cấp ủy', phone: '', email: '', status: 'ACTIVE' });
+    setShowAddOfficer(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSaveEditedOfficer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOfficer) return;
+    const updated = officers.map(o => o.id === editingOfficer.id ? editingOfficer : o);
+    setOfficers(updated);
+    localStorage.setItem('trolycvp_officers', JSON.stringify(updated));
+    setEditingOfficer(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const deleteOfficer = (id: string) => {
+    const updated = officers.filter(o => o.id !== id);
+    setOfficers(updated);
+    localStorage.setItem('trolycvp_officers', JSON.stringify(updated));
+    setDeleteConfirmId(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -268,6 +349,7 @@ export default function Admin() {
     localStorage.setItem('trolycvp_departments', JSON.stringify(departments));
     localStorage.setItem('trolycvp_routing_rules', JSON.stringify(routingRules));
     localStorage.setItem('trolycvp_legal_basis', JSON.stringify(legalBasis));
+    localStorage.setItem('trolycvp_officers', JSON.stringify(officers));
     localStorage.setItem('trolycvp_system_config', JSON.stringify(systemConfig));
 
     // Save to Firestore collections
@@ -726,110 +808,124 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200/80 bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-2xs gap-1 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'overview'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/60'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Tổng quan Giám sát</span>
-        </button>
+      {/* Navigation Tabs - Grouped & Compact */}
+      <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
+        {/* Row 1: Operations & AI & System */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 border-b border-slate-100">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 flex-shrink-0">Vận hành:</span>
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'overview'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Tổng quan</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('database')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'database'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-blue-700 font-extrabold bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/60'
-          }`}
-        >
-          <Database className="w-4 h-4 text-blue-600" />
-          <span>Liên thông CSDL & Bộ nhớ ({CONNECTED_APP_ID.substring(0, 8)})</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-        </button>
+          <button
+            onClick={() => setActiveTab('database')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'database'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-blue-700 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/60'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-blue-600" />
+            <span>CSDL & Bộ nhớ</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('brain')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'brain'
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 ring-1 ring-white/20'
-              : 'text-indigo-900 font-black bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80'
-          }`}
-        >
-          <BrainCircuit className="w-4 h-4 text-indigo-600 animate-pulse" />
-          <span>Bộ Não AI Google Drive</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-indigo-200 text-indigo-950 text-[10px] font-black">
-            _BO_NAO_AI.json
-          </span>
-        </button>
+          <button
+            onClick={() => setActiveTab('brain')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'brain'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                : 'text-indigo-900 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200'
+            }`}
+          >
+            <BrainCircuit className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span>Bộ Não AI Drive</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('routing')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'routing'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/60'
-          }`}
-        >
-          <FolderGit2 className="w-4 h-4" />
-          <span>Quy chuẩn Phân luồng ({routingRules.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('system')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'system'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Cấu hình AI</span>
+          </button>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('learning')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'learning'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-emerald-800 font-extrabold bg-emerald-50/90 hover:bg-emerald-100/90 border border-emerald-300/80'
-          }`}
-        >
-          <BrainCircuit className="w-4 h-4 text-emerald-600" />
-          <span>Tri thức AI & Máy học ({learnedRules.length})</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-950 text-[10px] font-black">
-            AI Auto-Learn
-          </span>
-        </button>
+        {/* Row 2: Rules, Staff & Legal */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 flex-shrink-0">Quy tắc & NS:</span>
+          <button
+            onClick={() => setActiveTab('routing')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'routing'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <FolderGit2 className="w-3.5 h-3.5" />
+            <span>Phân luồng ({routingRules.length})</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('departments')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'departments'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/60'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Đơn vị Chủ trì & Phối hợp ({departments.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('learning')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'learning'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-emerald-800 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-300'
+            }`}
+          >
+            <BrainCircuit className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Tri thức AI ({learnedRules.length})</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('legal')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'legal'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/60'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Thư viện Căn cứ Pháp lý ({legalBasis.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('departments')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'departments'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Đơn vị ({departments.length})</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('system')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'system'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/60'
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Cấu hình AI & Google Drive</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('officers')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'officers'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Chuyên viên & Cán bộ ({officers.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('legal')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'legal'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Căn cứ Pháp lý ({legalBasis.length})</span>
+          </button>
+        </div>
       </div>
 
       {/* TAB: DATABASE & MEMORY CONNECTION */}
@@ -1252,27 +1348,27 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {officers.map((officer) => (
-                    <tr key={officer.uid} className="hover:bg-slate-50/80 transition-colors">
+                  {systemUsers.map((user) => (
+                    <tr key={user.uid} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 font-bold text-slate-900 flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center">
-                          {officer.name.charAt(0)}
+                          {user.name.charAt(0)}
                         </div>
-                        <span>{officer.name}</span>
+                        <span>{user.name}</span>
                       </td>
-                      <td className="py-3 text-slate-600 font-mono">{officer.email}</td>
-                      <td className="py-3 text-slate-700">{officer.department}</td>
+                      <td className="py-3 text-slate-600 font-mono">{user.email}</td>
+                      <td className="py-3 text-slate-700">{user.department}</td>
                       <td className="py-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                          officer.role === 'ADMIN' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                          officer.role === 'LEADER' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                          user.role === 'ADMIN' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                          user.role === 'LEADER' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                         }`}>
-                          {officer.role}
+                          {user.role}
                         </span>
                       </td>
                       <td className="py-3 text-right">
                         <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                          {officer.status}
+                          {user.status}
                         </span>
                       </td>
                     </tr>
@@ -2047,6 +2143,344 @@ export default function Admin() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: OFFICERS (Phó Chánh VP & Chuyên viên) */}
+      {activeTab === 'officers' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">Quản lý Chuyên viên Văn phòng Đảng ủy & Phó Chánh Văn phòng</h2>
+              <p className="text-xs text-slate-500">Quản lý nhân sự chuyên viên thụ lý văn bản, phân công nhiệm vụ và theo dõi tiến độ</p>
+            </div>
+            <button
+              onClick={() => setShowAddOfficer(true)}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm Nhân sự mới</span>
+            </button>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm theo họ tên, phòng ban, số điện thoại..."
+                value={officerSearchQuery}
+                onChange={e => setOfficerSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={officerRoleFilter}
+                onChange={e => setOfficerRoleFilter(e.target.value as any)}
+                className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none"
+              >
+                <option value="ALL">Tất cả vai trò</option>
+                <option value="DEPUTY_CHIEF">Phó Chánh Văn phòng</option>
+                <option value="SPECIALIST">Chuyên viên thụ lý</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Add Officer Modal / Form */}
+          {showAddOfficer && (
+            <form onSubmit={handleAddOfficer} className="bg-white p-6 rounded-3xl border border-blue-200 shadow-md space-y-4 animate-in fade-in">
+              <div className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center justify-between">
+                <span>Thêm Nhân sự Phó Chánh Văn phòng / Chuyên viên mới</span>
+                <button type="button" onClick={() => setShowAddOfficer(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Họ và Tên (kèm học hàm/đơn vị)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Đ/c Nguyễn Văn Hùng"
+                    value={newOfficer.fullName}
+                    onChange={e => setNewOfficer({ ...newOfficer, fullName: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Vai trò / Chức trách</label>
+                  <select
+                    value={newOfficer.roleType}
+                    onChange={e => setNewOfficer({ ...newOfficer, roleType: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  >
+                    <option value="DEPUTY_CHIEF">Phó Chánh Văn phòng</option>
+                    <option value="SPECIALIST">Chuyên viên thụ lý</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Phòng ban / Đơn vị công tác</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Phòng Tổng hợp Cấp ủy"
+                    value={newOfficer.department}
+                    onChange={e => setNewOfficer({ ...newOfficer, department: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Số điện thoại liên hệ</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 0912345678"
+                    value={newOfficer.phone}
+                    onChange={e => setNewOfficer({ ...newOfficer, phone: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Hòm thư điện tử (Email)</label>
+                  <input
+                    type="email"
+                    placeholder="VD: hungnv@vanphong.gov.vn"
+                    value={newOfficer.email}
+                    onChange={e => setNewOfficer({ ...newOfficer, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Trạng thái công tác</label>
+                  <select
+                    value={newOfficer.status}
+                    onChange={e => setNewOfficer({ ...newOfficer, status: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  >
+                    <option value="ACTIVE">Đang hoạt động</option>
+                    <option value="BUSY">Đang bận công tác</option>
+                    <option value="ON_LEAVE">Nghỉ phép</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddOfficer(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                >
+                  Lưu & Thêm nhân sự
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Edit Officer Modal / Form */}
+          {editingOfficer && (
+            <form onSubmit={handleSaveEditedOfficer} className="bg-amber-50/80 p-6 rounded-3xl border border-amber-300 shadow-md space-y-4 animate-in fade-in">
+              <div className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center justify-between">
+                <span>Chỉnh sửa thông tin nhân sự: {editingOfficer.fullName}</span>
+                <button type="button" onClick={() => setEditingOfficer(null)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Họ và Tên</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingOfficer.fullName}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, fullName: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Vai trò / Chức trách</label>
+                  <select
+                    value={editingOfficer.roleType}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, roleType: e.target.value as any })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  >
+                    <option value="DEPUTY_CHIEF">Phó Chánh Văn phòng</option>
+                    <option value="SPECIALIST">Chuyên viên thụ lý</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Phòng ban</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingOfficer.department}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, department: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={editingOfficer.phone || ''}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, phone: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editingOfficer.email || ''}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, email: e.target.value })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Trạng thái</label>
+                  <select
+                    value={editingOfficer.status}
+                    onChange={e => setEditingOfficer({ ...editingOfficer, status: e.target.value as any })}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800"
+                  >
+                    <option value="ACTIVE">Đang hoạt động</option>
+                    <option value="BUSY">Đang bận công tác</option>
+                    <option value="ON_LEAVE">Nghỉ phép</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingOfficer(null)}
+                  className="px-4 py-2 bg-white text-slate-700 rounded-xl text-xs font-bold border border-slate-300"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Officers Table */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-black text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3">Họ và Tên Nhân sự</th>
+                    <th className="px-5 py-3">Vai trò Chức trách</th>
+                    <th className="px-5 py-3">Đơn vị / Phòng ban</th>
+                    <th className="px-5 py-3">Liên hệ (Điện thoại / Email)</th>
+                    <th className="px-5 py-3">Trạng thái</th>
+                    <th className="px-5 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {filteredOfficers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-8 text-center text-slate-400 italic">
+                        Không tìm thấy nhân sự phù hợp với bộ lọc tìm kiếm.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOfficers.map((officer) => (
+                      <tr key={officer.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-5 py-3.5 font-bold text-slate-900 flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-white text-xs ${
+                            officer.roleType === 'DEPUTY_CHIEF' ? 'bg-indigo-600 shadow-sm' : 'bg-blue-500'
+                          }`}>
+                            {officer.fullName.replace('Đ/c ', '').charAt(0)}
+                          </div>
+                          <span>{officer.fullName}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${
+                            officer.roleType === 'DEPUTY_CHIEF'
+                              ? 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
+                          }`}>
+                            {officer.roleType === 'DEPUTY_CHIEF' ? '🛡️ Phó Chánh Văn phòng' : '📋 Chuyên viên thụ lý'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 font-medium text-slate-700">
+                          {officer.department}
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-600">
+                          <div className="font-mono text-[11px]">{officer.phone || 'Chưa cập nhật'}</div>
+                          <div className="text-[11px] text-slate-400">{officer.email || ''}</div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            officer.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : officer.status === 'BUSY'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              officer.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : officer.status === 'BUSY' ? 'bg-amber-500' : 'bg-slate-400'
+                            }`} />
+                            {officer.status === 'ACTIVE' ? 'Đang hoạt động' : officer.status === 'BUSY' ? 'Đang bận' : 'Nghỉ phép'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right space-x-1">
+                          {deleteConfirmId === officer.id ? (
+                            <div className="inline-flex items-center gap-1 bg-red-50 p-1 rounded-xl border border-red-200">
+                              <span className="text-[10px] font-bold text-red-700 px-1">Xóa?</span>
+                              <button
+                                onClick={() => deleteOfficer(officer.id)}
+                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-bold"
+                              >
+                                Có
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-bold"
+                              >
+                                Không
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setEditingOfficer(officer)}
+                                className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 rounded-lg transition-colors inline-flex items-center"
+                                title="Chỉnh sửa thông tin"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(officer.id)}
+                                className="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded-lg transition-colors inline-flex items-center"
+                                title="Xóa nhân sự"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

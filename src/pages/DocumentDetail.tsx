@@ -5,7 +5,7 @@ import { db, getAccessToken, requestDriveAccess } from '../lib/firebase';
 import { 
   FileText, Loader2, Sparkles, Check, CheckSquare, Printer, 
   ArrowLeft, Clock, ShieldCheck, Building2, Edit3, Save, RotateCcw, BrainCircuit,
-  Scale, FileSignature, AlertCircle, ExternalLink, HardDrive, UploadCloud, Tag, Plus, X
+  Scale, FileSignature, AlertCircle, ExternalLink, HardDrive, UploadCloud, Tag, Plus, X, Bell
 } from 'lucide-react';
 import { Document, Task } from '../types';
 import DispatchSlip from '../components/DispatchSlip';
@@ -43,9 +43,25 @@ export default function DocumentDetail() {
   const [editAction, setEditAction] = useState('');
   const [editOpinion, setEditOpinion] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
+  const [editDocType, setEditDocType] = useState('Văn bản chỉ đạo');
   const [isSavingAiRule, setIsSavingAiRule] = useState(false);
   const [matchedLearnedRule, setMatchedLearnedRule] = useState<LearningRule | null>(null);
   const [learningNotification, setLearningNotification] = useState<string | null>(null);
+
+  // AI Summary States
+  const [summarizingDoc, setSummarizingDoc] = useState(false);
+  const [documentSummary, setDocumentSummary] = useState<{
+    executiveSummary: string;
+    keyPoints: string[];
+    urgencyAssessment: string;
+    suggestedActions: string;
+  } | null>(null);
+
+  // Reminder & Deadline Settings States
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderDaysBefore, setReminderDaysBefore] = useState(3);
+  const [reminderNotes, setReminderNotes] = useState('');
+  const [savingReminder, setSavingReminder] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -63,6 +79,10 @@ export default function DocumentDetail() {
           setEditAction(fetchedData.proposedAction || '');
           setEditOpinion(fetchedData.advisoryOpinion || '');
           setEditDeadline(fetchedData.actionDeadline || '');
+          setEditDocType(fetchedData.documentType || 'Văn bản chỉ đạo');
+          setReminderEnabled(fetchedData.reminderEnabled ?? true);
+          setReminderDaysBefore(fetchedData.reminderDaysBefore ?? 3);
+          setReminderNotes(fetchedData.reminderNotes || '');
 
           // Check if document matches any learned rule
           const rules = await getActiveLearningRules();
@@ -88,6 +108,7 @@ export default function DocumentDetail() {
     setEditAction(document.proposedAction || '');
     setEditOpinion(document.advisoryOpinion || '');
     setEditDeadline(document.actionDeadline || '');
+    setEditDocType(document.documentType || 'Văn bản chỉ đạo');
     setIsEditingProposal(true);
   };
 
@@ -107,6 +128,7 @@ export default function DocumentDetail() {
       proposedAction: editAction,
       advisoryOpinion: editOpinion,
       actionDeadline: editDeadline,
+      documentType: editDocType,
     };
 
     try {
@@ -245,10 +267,106 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleGenerateAiSummary = async () => {
+    if (!document) return;
+    try {
+      setSummarizingDoc(true);
+      const res = await fetch('/api/summarize-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentData: document })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDocumentSummary(data);
+      } else {
+        alert(data.error || 'Tóm tắt văn bản thất bại.');
+      }
+    } catch (err: any) {
+      console.error('Error summarizing document:', err);
+      alert('Lỗi kết nối khi gọi AI tóm tắt văn bản.');
+    } finally {
+      setSummarizingDoc(false);
+    }
+  };
+
+  const handleSaveReminder = async () => {
+    if (!id || !document) return;
+    try {
+      setSavingReminder(true);
+      const updateData = {
+        actionDeadline: editDeadline,
+        reminderEnabled,
+        reminderDaysBefore,
+        reminderNotes
+      };
+      await updateDoc(doc(db, 'documents', id), updateData);
+      setDocument(prev => prev ? { ...prev, ...updateData } : null);
+      alert('Đã cập nhật deadline và cấu hình thông báo nhắc nhở thành công!');
+    } catch (err) {
+      console.error('Error saving reminder:', err);
+      alert('Lỗi khi lưu cấu hình nhắc nhở.');
+    } finally {
+      setSavingReminder(false);
+    }
+  };
+
+  const autoSyncToDriveIfNeeded = async () => {
+    if (!document || !id || document.driveFileId) return;
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+
+      const contentSummary = `VĂN BẢN: ${document.title || document.fileName}
+Số hiệu: ${document.documentNumber || 'N/A'}
+Cơ quan ban hành: ${document.issuer || document.leadDepartment || 'N/A'}
+Ngày ban hành: ${document.issuedDate || 'N/A'}
+Trích yếu: ${document.summary || 'N/A'}
+Đề xuất xử lý: ${document.proposedAction || 'N/A'}
+Nội dung chi tiết: ${document.fullContent || document.summary || ''}`;
+
+      const blob = new Blob([contentSummary], { type: 'text/plain;charset=utf-8' });
+      const fileName = `${document.documentNumber ? document.documentNumber.replace(/[\/\\]/g, '_') + '_' : ''}${document.fileName || 'van_ban_chi_dao.txt'}`;
+      const file = new File([blob], fileName, { type: 'text/plain' });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('workspaceToken', token);
+
+      const res = await fetch('/api/drive/sync-file', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.driveFileId) {
+        await updateDoc(doc(db, 'documents', id), {
+          driveFileId: data.driveFileId,
+          driveUrl: data.driveUrl,
+          driveFolderId: data.driveFolderId || null,
+          driveFolderUrl: data.driveFolderUrl || null,
+        });
+        setDocument(prev => prev ? {
+          ...prev,
+          driveFileId: data.driveFileId,
+          driveUrl: data.driveUrl,
+          driveFolderId: data.driveFolderId || null,
+          driveFolderUrl: data.driveFolderUrl || null,
+        } : null);
+      }
+    } catch (err) {
+      console.warn('Auto sync to drive error:', err);
+    }
+  };
+
   const handleExtractTasks = async () => {
     if (!document) return;
     setExtractingTasks(true);
     try {
+      // Simultaneously upload/sync to Google Drive if not already synced
+      await autoSyncToDriveIfNeeded();
+
       const res = await fetch('/api/extract-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -518,6 +636,159 @@ export default function DocumentDetail() {
         {/* Tab 1: Advisory & Routing */}
         {activeTab === 'advisory' && (
           <div className="p-6 md:p-8 space-y-6">
+            {/* AI Document Executive Summary Card */}
+            <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-950 p-6 rounded-2xl text-white shadow-lg space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-800/60 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-white shadow-md">
+                    <Sparkles className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wider text-white">Tóm tắt Thông minh & Trích xuất Ý chính (Gemini AI)</h3>
+                    <p className="text-xs text-indigo-200/80 mt-0.5">Tự động phân tích nội dung cốt lõi, đánh giá mức độ khẩn cấp và đề xuất hướng xử lý</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleGenerateAiSummary}
+                  disabled={summarizingDoc}
+                  className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer flex-shrink-0"
+                >
+                  {summarizingDoc ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>AI đang phân tích & tóm tắt...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>{documentSummary ? 'Tóm tắt lại bằng AI' : '🤖 Tạo Tóm tắt AI ngay'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {documentSummary && (
+                <div className="space-y-4 pt-2 animate-in fade-in duration-300">
+                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-[11px] font-extrabold uppercase text-indigo-300 tracking-wider">Tóm tắt cốt lõi (Executive Summary):</div>
+                    <p className="text-xs text-white leading-relaxed font-medium">{documentSummary.executiveSummary}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                      <div className="text-[11px] font-extrabold uppercase text-blue-300 tracking-wider">Các điểm trọng tâm (Key Points):</div>
+                      <ul className="space-y-1.5 text-xs text-indigo-100 list-disc list-inside">
+                        {documentSummary.keyPoints?.map((pt, idx) => (
+                          <li key={idx} className="leading-relaxed">{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/10 space-y-1">
+                        <div className="text-[11px] font-extrabold uppercase text-amber-300 tracking-wider">Đánh giá tính cấp bách:</div>
+                        <p className="text-xs text-amber-100 font-semibold">{documentSummary.urgencyAssessment}</p>
+                      </div>
+
+                      <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/10 space-y-1">
+                        <div className="text-[11px] font-extrabold uppercase text-emerald-300 tracking-wider">Đề xuất hướng xử lý:</div>
+                        <p className="text-xs text-emerald-100 font-medium">{documentSummary.suggestedActions}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!documentSummary && !summarizingDoc && (
+                <div className="text-center py-6 text-indigo-200/70 text-xs italic">
+                  Nhấp vào nút <strong className="text-white">"🤖 Tạo Tóm tắt AI ngay"</strong> ở góc trên để AI tự động bóc tách và tóm tắt văn bản.
+                </div>
+              )}
+            </div>
+
+            {/* Proactive Deadline & Reminder Configuration Card */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase">Cài đặt Hạn Xử Lý & Thông Báo Nhắc Nhở Chủ Động</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Hệ thống sẽ tự động hiển thị thông báo toast & cảnh báo trên dashboard khi đến hạn</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveReminder}
+                  disabled={savingReminder}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                >
+                  {savingReminder ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>Lưu Cấu Hình Nhắc Nhở</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Hạn xử lý văn bản (DD/MM/YYYY)
+                  </label>
+                  <input
+                    type="text"
+                    value={editDeadline}
+                    onChange={(e) => setEditDeadline(e.target.value)}
+                    placeholder="VD: 30/08/2026"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Cảnh báo trước (Số ngày)
+                  </label>
+                  <select
+                    value={reminderDaysBefore}
+                    onChange={(e) => setReminderDaysBefore(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                  >
+                    <option value={1}>Nhắc trước 1 ngày</option>
+                    <option value={3}>Nhắc trước 3 ngày (Mặc định)</option>
+                    <option value={5}>Nhắc trước 5 ngày</option>
+                    <option value={7}>Nhắc trước 7 ngày</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={reminderEnabled}
+                      onChange={(e) => setReminderEnabled(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold text-slate-800">Bật hệ thống nhắc nhở tự động</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Ghi chú / Chỉ đạo nhắc nhở riêng cho văn bản này
+                </label>
+                <input
+                  type="text"
+                  value={reminderNotes}
+                  onChange={(e) => setReminderNotes(e.target.value)}
+                  placeholder="VD: Lưu ý đôn đốc Ban Tổ chức và Văn phòng gửi báo cáo trước hạn..."
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
             {/* Tags / Categorization Section */}
             <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200/90 space-y-3">
               <div className="flex items-center justify-between">
@@ -559,54 +830,51 @@ export default function DocumentDetail() {
                 )}
               </div>
 
-              {/* Tag selector popup / inline form */}
+              {/* Tag selector dropdown */}
               {showTagSelector && (
-                <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-md space-y-2.5 animate-in fade-in duration-150">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase">Chọn tag chuẩn hoặc nhập tag tùy chỉnh:</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {STANDARD_TAGS.map((st) => {
-                      const isSelected = docTags.includes(st);
-                      const style = getTagStyle(st);
-                      return (
-                        <button
-                          key={st}
-                          type="button"
-                          disabled={isSelected}
-                          onClick={() => handleAddTag(st)}
-                          className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
-                            isSelected 
-                              ? 'opacity-40 bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
-                              : `${style.bgClass} hover:scale-105 cursor-pointer`
-                          }`}
-                        >
-                          {style.icon} {st} {isSelected ? '✓' : '+'}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                    <input
-                      type="text"
-                      placeholder="Tự nhập nhãn tag mới..."
-                      value={newTagInput}
-                      onChange={(e) => setNewTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTag(newTagInput);
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2 animate-in fade-in duration-150">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <select
+                      className="w-full sm:flex-1 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddTag(e.target.value);
+                          e.target.value = '';
                         }
                       }}
-                      className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddTag(newTagInput)}
-                      disabled={!newTagInput.trim()}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                      defaultValue=""
                     >
-                      Thêm
-                    </button>
+                      <option value="" disabled>-- Chọn tag nghiệp vụ chuẩn để thêm nhanh --</option>
+                      {STANDARD_TAGS.filter(st => !docTags.includes(st)).map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="w-full sm:w-auto flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Hoặc nhập tag mới..."
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddTag(newTagInput);
+                          }
+                        }}
+                        className="flex-1 sm:w-40 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddTag(newTagInput)}
+                        disabled={!newTagInput.trim()}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                      >
+                        Thêm
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -740,7 +1008,28 @@ export default function DocumentDetail() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Thể loại / Phân loại văn bản
+                      </label>
+                      <select
+                        value={editDocType}
+                        onChange={(e) => setEditDocType(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                      >
+                        <option value="Văn bản chỉ đạo">Văn bản chỉ đạo</option>
+                        <option value="Thông báo">Thông báo</option>
+                        <option value="Báo cáo">Báo cáo</option>
+                        <option value="Quyết định">Quyết định</option>
+                        <option value="Nghị quyết">Nghị quyết</option>
+                        <option value="Kế hoạch">Kế hoạch</option>
+                        <option value="Tờ trình">Tờ trình</option>
+                        <option value="Công văn">Công văn</option>
+                        <option value="Chỉ thị">Chỉ thị</option>
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Cơ quan / Đơn vị chủ trì
@@ -749,24 +1038,26 @@ export default function DocumentDetail() {
                         type="text"
                         value={editLeadDept}
                         onChange={(e) => setEditLeadDept(e.target.value)}
-                        placeholder="VD: Đội Trật tự Đô thị & Công an Phường, Bộ phận Tài chính..."
+                        placeholder="VD: Đội Trật tự Đô thị & Công an Phường..."
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Các đơn vị phối hợp (ngăn cách bằng dấu phẩy)
+                        Các đơn vị phối hợp (ngăn cách dấu phẩy)
                       </label>
                       <input
                         type="text"
                         value={editCoordinating}
                         onChange={(e) => setEditCoordinating(e.target.value)}
-                        placeholder="VD: Công an Phường, Mặt trận Tổ quốc, Đoàn Thanh niên"
+                        placeholder="VD: Công an Phường, Đoàn Thanh niên..."
                         className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         Hướng phân luồng xử lý chính

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Document } from '../types';
 import { 
@@ -40,6 +40,39 @@ export default function DocumentList() {
   const [filterType, setFilterType] = useState<ProgressFilter>('ALL');
   const [selectedSlipDoc, setSelectedSlipDoc] = useState<Document | null>(null);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('ALL');
+
+  const [deputyChiefs] = useState<string[]>(() => {
+    const saved = localStorage.getItem('trolycvp_officers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const deputies = parsed.filter((o: any) => o.roleType === 'DEPUTY_CHIEF').map((o: any) => `${o.fullName} - Phó Chánh VP`);
+        if (deputies.length > 0) return deputies;
+      } catch (e) {}
+    }
+    return [
+      'Đ/c Nguyễn Văn Hùng - Phó Chánh VP',
+      'Đ/c Lê Thị Minh - Phó Chánh VP',
+      'Đ/c Trần Quốc Tuấn - Phó Chánh VP',
+      'Đ/c Hoàng Văn Nam - Phó Chánh VP'
+    ];
+  });
+
+  const handleUpdateDeputyChief = async (docId: string, deputy: string) => {
+    try {
+      await updateDoc(doc(db, 'documents', docId), { assignedDeputyChief: deputy });
+    } catch (err) {
+      console.error("Error updating assigned deputy chief:", err);
+    }
+  };
+
+  const handleUpdateProcessingResult = async (docId: string, result: string) => {
+    try {
+      await updateDoc(doc(db, 'documents', docId), { processingResult: result });
+    } catch (err) {
+      console.error("Error updating processing result:", err);
+    }
+  };
 
   // Debounce search term
   useEffect(() => {
@@ -356,39 +389,34 @@ export default function DocumentList() {
           </div>
         </div>
 
-        {/* Bottom Row: Tag Filter Chips */}
-        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1 text-xs">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1 mr-1">
-            <Filter className="w-3 h-3 text-blue-600" /> Lọc theo chủ đề:
-          </span>
-          <button
-            onClick={() => setSelectedTagFilter('ALL')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
-              selectedTagFilter === 'ALL'
-                ? 'bg-blue-950 text-white shadow-2xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Tất cả chủ đề
-          </button>
-          {STANDARD_TAGS.map((tag) => {
-            const isSelected = selectedTagFilter === tag;
-            const style = getTagStyle(tag);
-            return (
-              <button
-                key={tag}
-                onClick={() => setSelectedTagFilter(isSelected ? 'ALL' : tag)}
-                className={`px-2 py-0.5 rounded-lg text-[11px] border transition-all flex items-center gap-1 cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-600 text-white font-black border-blue-600 shadow-2xs scale-105'
-                    : `${style.bgClass} hover:opacity-85`
-                }`}
-              >
-                <span>{style.icon}</span>
-                <span>{tag}</span>
-              </button>
-            );
-          })}
+        {/* Bottom Row: Topic / Tag Droplist Filter */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 flex-1 max-w-xs">
+            <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 whitespace-nowrap">
+              <Filter className="w-3.5 h-3.5 text-blue-600" /> Chủ đề / Nghiệp vụ:
+            </span>
+            <select
+              value={selectedTagFilter}
+              onChange={(e) => setSelectedTagFilter(e.target.value)}
+              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">-- Tất cả chủ đề ({documents.length}) --</option>
+              {STANDARD_TAGS.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedTagFilter !== 'ALL' && (
+            <button
+              onClick={() => setSelectedTagFilter('ALL')}
+              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 cursor-pointer"
+            >
+              Đặt lại bộ lọc chủ đề
+            </button>
+          )}
         </div>
       </div>
 
@@ -400,10 +428,10 @@ export default function DocumentList() {
               <tr>
                 <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-36">Số / Ký hiệu</th>
                 <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider">Trích yếu nội dung & Cơ quan gửi</th>
-                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-48">Đề xuất Tham mưu</th>
-                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-36">Chủ trì</th>
-                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-36">Tiến độ hạn chót</th>
-                <th className="px-5 py-3 text-right text-[11px] font-black text-slate-500 uppercase tracking-wider w-40">Thao tác</th>
+                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-40">Đề xuất Tham mưu</th>
+                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-56">Phó Chánh VP & Kết quả xử lý</th>
+                <th className="px-5 py-3 text-left text-[11px] font-black text-slate-500 uppercase tracking-wider w-32">Tiến độ hạn chót</th>
+                <th className="px-5 py-3 text-right text-[11px] font-black text-slate-500 uppercase tracking-wider w-36">Thao tác</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100 text-xs">
@@ -489,12 +517,44 @@ export default function DocumentList() {
                       )}
                     </td>
 
-                    {/* Cơ quan / Đơn vị Chủ trì */}
-                    <td className="px-5 py-3.5 whitespace-nowrap align-top">
-                      <div className="font-bold text-slate-800 text-xs">{doc.leadDepartment || 'Văn phòng Đảng ủy'}</div>
+                    {/* Phó Chánh VP & Kết quả xử lý */}
+                    <td className="px-5 py-3.5 align-top space-y-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Giao Phó Chánh VP:</label>
+                        <select
+                          value={doc.assignedDeputyChief || ''}
+                          onChange={(e) => handleUpdateDeputyChief(doc.id, e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">-- Chọn Phó Chánh VP --</option>
+                          {deputyChiefs.map((deputy, idx) => (
+                            <option key={idx} value={deputy}>{deputy}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Kết quả xử lý:</label>
+                        <select
+                          value={doc.processingResult || 'IN_PROGRESS'}
+                          onChange={(e) => handleUpdateProcessingResult(doc.id, e.target.value)}
+                          className={`w-full border rounded-xl px-2 py-1 text-xs font-bold focus:outline-none ${
+                            doc.processingResult === 'COMPLETED'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : doc.processingResult === 'OVERDUE'
+                              ? 'bg-red-50 text-red-800 border-red-300'
+                              : 'bg-amber-50 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          <option value="IN_PROGRESS">⏳ Đang thực hiện</option>
+                          <option value="COMPLETED">✅ Đã hoàn thành</option>
+                          <option value="PENDING">⏱️ Chờ xử lý / Chưa giao</option>
+                          <option value="OVERDUE">⚠️ Trễ hạn / Cần đôn đốc</option>
+                        </select>
+                      </div>
                     </td>
 
-                    {/* Tiến độ phải xong */}
+                    {/* Tiến độ hạn chót */}
                     <td className="px-5 py-3.5 whitespace-nowrap align-top">
                       <div className="space-y-1">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] border ${progress.badgeClass}`}>

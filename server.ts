@@ -529,6 +529,57 @@ app.post('/api/extract-tasks', async (req, res) => {
   }
 });
 
+// Summarize Document using Gemini API endpoint
+app.post('/api/summarize-document', async (req, res) => {
+  try {
+    const { documentData } = req.body;
+    if (!documentData) {
+      return res.status(400).json({ error: 'Không có dữ liệu văn bản' });
+    }
+
+    const schema = {
+      type: Type.OBJECT,
+      properties: {
+        executiveSummary: { type: Type.STRING },
+        keyPoints: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        },
+        urgencyAssessment: { type: Type.STRING },
+        suggestedActions: { type: Type.STRING }
+      },
+      required: ['executiveSummary', 'keyPoints', 'urgencyAssessment', 'suggestedActions']
+    };
+
+    const response = await generateContentWithFallback({
+      contents: [
+        {
+          text: `Bạn là trợ lý AI chuyên nghiệp của Văn phòng Đảng ủy và UBND. Hãy đọc kỹ thông tin văn bản hành chính sau đây và tạo một bản tóm tắt chuyên sâu, súc tích bằng tiếng Việt:\n${JSON.stringify(documentData, null, 2)}\n\nHãy phân tích rõ:\n1. executiveSummary: Tóm tắt nội dung cốt lõi của văn bản trong 2-3 câu.\n2. keyPoints: Danh sách 3-5 ý chính, điểm trọng tâm quan trọng nhất cần lưu ý.\n3. urgencyAssessment: Đánh giá tính cấp bách và tác động của văn bản.\n4. suggestedActions: Đề xuất hướng xử lý cụ thể cho Văn phòng hoặc chuyên viên tham mưu.`
+        }
+      ],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
+    });
+
+    if (response && response.text) {
+      try {
+        const cleaned = cleanJsonText(response.text);
+        const parsed = JSON.parse(cleaned);
+        res.json(normalizeVietnameseData(parsed));
+      } catch (e) {
+        res.status(500).json({ error: 'Lỗi xử lý kết quả tóm tắt từ AI.' });
+      }
+    } else {
+      res.status(500).json({ error: 'Không nhận được phản hồi từ mô hình AI.' });
+    }
+  } catch (error: any) {
+    console.error('Summarize document error:', error);
+    res.status(500).json({ error: error.message || 'Tóm tắt văn bản thất bại. Vui lòng thử lại.' });
+  }
+});
+
 // General Chat / Advice endpoint
 app.post('/api/chat', async (req, res) => {
   try {
@@ -986,7 +1037,7 @@ app.post('/api/audit-document', upload.single('file'), async (req, res) => {
     const file = req.file;
     let tmpFilePath = file ? file.path : null;
 
-    if (file && !documentText) {
+    if (file) {
       const fileBuffer = fs.readFileSync(tmpFilePath!);
       const base64Data = fileBuffer.toString('base64');
       const mimeType = file.mimetype || 'application/octet-stream';

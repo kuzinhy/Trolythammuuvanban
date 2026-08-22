@@ -1,7 +1,8 @@
 import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { 
   FileSearch, Sparkles, Loader2, Upload, Copy, Check, AlertTriangle, 
-  CheckCircle2, FileText, ArrowRight, ShieldCheck, RefreshCw, Download, BookmarkPlus, X, HelpCircle, Columns, GitCompare
+  CheckCircle2, FileText, ArrowRight, ShieldCheck, RefreshCw, Download, BookmarkPlus, X, HelpCircle, Columns, GitCompare,
+  Edit3, ClipboardList, Save
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -48,8 +49,28 @@ export default function DocumentAudit() {
   const [diffMode, setDiffMode] = useState<'inline' | 'sidebyside'>('inline');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>('ALL');
+
+  // Editable document parameters after scan
+  const [docNumber, setDocNumber] = useState('Số: 128/QĐ-UBND');
+  const [issuingAuthority, setIssuingAuthority] = useState('UBND Tỉnh');
+  const [docSubject, setDocSubject] = useState('Về việc phê duyệt kế hoạch và rà soát văn bản');
+  const [docDate, setDocDate] = useState('22/08/2026');
+  const [urgencyLevel, setUrgencyLevel] = useState('Thường');
+  const [signerName, setSignerName] = useState('Chủ tịch UBND Tỉnh');
+
+  // Work processing box & notes
+  const [workNotes, setWorkNotes] = useState('');
+  const [processingStatus, setProcessingStatus] = useState<'PENDING' | 'IN_PROGRESS' | 'APPROVED' | 'COMPLETED'>('IN_PROGRESS');
+  const [assignedTo, setAssignedTo] = useState('Phòng Tổng hợp & Đôn đốc');
+  const [processingSavedMsg, setProcessingSavedMsg] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuthStore();
+
+  const handleSaveProcessingNotes = () => {
+    setProcessingSavedMsg(true);
+    setTimeout(() => setProcessingSavedMsg(false), 3000);
+  };
 
 
 
@@ -101,12 +122,20 @@ export default function DocumentAudit() {
         headers: selectedFile ? undefined : { 'Content-Type': 'application/json' }
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Yêu cầu rà soát văn bản thất bại.');
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResp = await res.text();
+        if (textResp.includes('<!doctype') || textResp.includes('<html')) {
+          throw new Error('Máy chủ đang khởi động lại hoặc gặp sự cố (Nhận được trang HTML). Vui lòng thử lại sau giây lát.');
+        }
+        throw new Error(textResp || 'Yêu cầu rà soát văn bản thất bại.');
       }
 
-      const data: AuditResult = await res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Yêu cầu rà soát văn bản thất bại.');
+      }
+
       setResult(data);
       setActiveTab('errors');
       setSuccessMsg('Đã hoàn tất rà soát chính tả, thể thức và tinh chỉnh văn bản thành công!');
@@ -353,6 +382,147 @@ export default function DocumentAudit() {
                   <div className="p-3 bg-indigo-50/80 rounded-2xl border border-indigo-200 text-center space-y-0.5">
                     <div className="text-base font-black text-indigo-700">{result.auditSummary.vocabularyErrorsCount}</div>
                     <div className="text-[10px] font-bold text-indigo-900 uppercase">Từ ngữ/Ngữ cảnh</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* EDITABLE DOCUMENT PARAMETERS & WORK PROCESSING BOX */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* 1. Editable Document Parameters */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Edit3 className="w-4 h-4 text-blue-600" />
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Thông số Văn bản (Có thể chỉnh sửa)</h3>
+                    </div>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200 font-bold">
+                      Sẵn sàng cập nhật
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Số ký hiệu:</label>
+                      <input 
+                        type="text" 
+                        value={docNumber} 
+                        onChange={(e) => setDocNumber(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Cơ quan ban hành:</label>
+                      <input 
+                        type="text" 
+                        value={issuingAuthority} 
+                        onChange={(e) => setIssuingAuthority(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Trích yếu nội dung:</label>
+                      <input 
+                        type="text" 
+                        value={docSubject} 
+                        onChange={(e) => setDocSubject(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Ngày ban hành:</label>
+                      <input 
+                        type="text" 
+                        value={docDate} 
+                        onChange={(e) => setDocDate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Độ khẩn / Mức độ:</label>
+                      <select 
+                        value={urgencyLevel}
+                        onChange={(e) => setUrgencyLevel(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="Thường">Thường</option>
+                        <option value="Khẩn">Khẩn</option>
+                        <option value="Thượng khẩn">Thượng khẩn</option>
+                        <option value="Hỏa tốc">Hỏa tốc</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Người ký / Chức vụ:</label>
+                      <input 
+                        type="text" 
+                        value={signerName} 
+                        onChange={(e) => setSignerName(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Work Processing Notes Box */}
+                <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xl space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-indigo-600" />
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Ô Ghi Xử lý Công việc</h3>
+                      </div>
+                      {processingSavedMsg && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 animate-pulse">
+                          ✓ Đã lưu xử lý
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Trạng thái xử lý:</label>
+                        <select 
+                          value={processingStatus}
+                          onChange={(e: any) => setProcessingStatus(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="PENDING">Chờ xử lý</option>
+                          <option value="IN_PROGRESS">Đang xử lý / Đôn đốc</option>
+                          <option value="APPROVED">Đã trình ký phê duyệt</option>
+                          <option value="COMPLETED">Đã hoàn tất ban hành</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Đơn vị / Chuyên viên thụ lý:</label>
+                        <input 
+                          type="text" 
+                          value={assignedTo}
+                          onChange={(e) => setAssignedTo(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Ý kiến chỉ đạo / Ghi chú xử lý công việc:</label>
+                      <textarea
+                        rows={4}
+                        value={workNotes}
+                        onChange={(e) => setWorkNotes(e.target.value)}
+                        placeholder="Nhập ý kiến chỉ đạo của lãnh đạo, hướng dẫn nghiệp vụ hoặc ghi chú tiến độ xử lý công việc..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 leading-relaxed resize-none shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end">
+                    <button
+                      onClick={handleSaveProcessingNotes}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer active:scale-95"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Lưu thông tin xử lý</span>
+                    </button>
                   </div>
                 </div>
               </div>

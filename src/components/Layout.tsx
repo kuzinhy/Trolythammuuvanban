@@ -3,12 +3,13 @@ import { Outlet, NavLink, useLocation, Link } from "react-router";
 import { logout, db } from "../lib/firebase";
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { useAuthStore, isSystemAdmin } from "../store/authStore";
-import { Document } from "../types";
+import { Document, Task } from "../types";
 import { getDocumentProgressStatus, isUrgentDocument } from "../lib/documentUtils";
+import { TaskReminderToasts } from "./TaskReminderToasts";
 import { 
   FileText, LayoutDashboard, CheckSquare, LogOut, Search, 
   Sparkles, Building2, ChevronRight, HardDrive, ExternalLink, 
-  ShieldAlert, Settings, Layers, ShieldCheck, MapPin,
+  ShieldAlert, Settings, Layers, ShieldCheck, MapPin, BarChart3,
   Bell, BellRing, X, ArrowRight, AlertTriangle, CheckCircle2, FileSearch
 } from "lucide-react";
 import AIAssistant from "./AIAssistant";
@@ -22,18 +23,28 @@ export default function Layout() {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [showNotifPopover, setShowNotifPopover] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   
   const isAdmin = isSystemAdmin(user);
 
-  // Realtime notification sync for urgent & overdue documents
+  // Realtime notification sync for documents and tasks
   useEffect(() => {
     const qDocs = query(collection(db, 'documents'), orderBy('createdAt', 'desc'), limit(100));
-    const unsubscribe = onSnapshot(qDocs, (snapshot) => {
+    const unsubscribeDocs = onSnapshot(qDocs, (snapshot) => {
       const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Document));
       setDocuments(docs);
-    }, (err) => console.error("Notification listener error:", err));
+    }, (err) => console.error("Docs notification listener error:", err));
 
-    return () => unsubscribe();
+    const qTasks = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(50));
+    const unsubscribeTasks = onSnapshot(qTasks, (snapshot) => {
+      const ts = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Task));
+      setTasks(ts);
+    }, (err) => console.error("Tasks notification listener error:", err));
+
+    return () => {
+      unsubscribeDocs();
+      unsubscribeTasks();
+    };
   }, []);
 
   // Compute urgent, overdue, and due soon documents
@@ -109,7 +120,7 @@ export default function Layout() {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <FileText className="w-4 h-4 flex-shrink-0 text-amber-300" />
-                <span className="truncate">Văn bản Đến & Trình Bí thư</span>
+                <span className="truncate">Văn bản Đến</span>
               </div>
               {urgentCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-pulse flex-shrink-0 shadow-xs">
@@ -129,7 +140,7 @@ export default function Layout() {
               )}
             >
               <LayoutDashboard className="w-4 h-4 flex-shrink-0 text-blue-200" />
-              <span className="truncate">Bàn làm việc Lãnh đạo</span>
+              <span className="truncate">Bàn làm việc</span>
             </NavLink>
 
             <NavLink
@@ -142,14 +153,14 @@ export default function Layout() {
               )}
             >
               <CheckSquare className="w-4 h-4 flex-shrink-0 text-blue-200" />
-              <span className="truncate">Đôn đốc Nhiệm vụ Chỉ đạo</span>
+              <span className="truncate">Đôn đốc Nhiệm vụ</span>
             </NavLink>
           </div>
 
           {/* Group 2: AI & GIS Decision Support */}
           <div className="space-y-1 pt-2 border-t border-blue-800/60">
             <div className="px-3 pb-1 text-[10px] font-black text-amber-300 uppercase tracking-wider flex items-center justify-between">
-              <span>II. Trợ lý AI Soạn thảo & GIS</span>
+              <span>II. Trợ lý AI & GIS</span>
             </div>
 
             <NavLink
@@ -162,7 +173,7 @@ export default function Layout() {
               )}
             >
               <Sparkles className="w-4 h-4 text-amber-300 flex-shrink-0" />
-              <span className="truncate">Soạn Kết luận & Chỉ thị AI</span>
+              <span className="truncate">Soạn Chỉ đạo AI</span>
             </NavLink>
 
             <NavLink
@@ -175,7 +186,7 @@ export default function Layout() {
               )}
             >
               <FileSearch className="w-4 h-4 text-emerald-300 flex-shrink-0" />
-              <span className="truncate">Rà soát & Sửa lỗi Văn bản</span>
+              <span className="truncate">Rà soát Thể thức</span>
             </NavLink>
 
             <NavLink
@@ -188,7 +199,7 @@ export default function Layout() {
               )}
             >
               <Search className="w-4 h-4 flex-shrink-0 text-blue-200" />
-              <span className="truncate">Tra cứu Quy chế & Văn bản</span>
+              <span className="truncate">Tra cứu Văn bản</span>
             </NavLink>
 
             <NavLink
@@ -201,7 +212,20 @@ export default function Layout() {
               )}
             >
               <MapPin className="w-4 h-4 text-red-300 flex-shrink-0" />
-              <span className="truncate">Bản đồ Giám sát Địa bàn</span>
+              <span className="truncate">Bản đồ Địa bàn</span>
+            </NavLink>
+
+            <NavLink
+              to="/reports"
+              className={({ isActive }) => cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150",
+                isActive
+                  ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-500/25 ring-1 ring-white/20"
+                  : "text-blue-100/90 hover:bg-blue-800/80 hover:text-white"
+              )}
+            >
+              <BarChart3 className="w-4 h-4 text-amber-300 flex-shrink-0" />
+              <span className="truncate">Báo cáo Định kỳ</span>
             </NavLink>
           </div>
 
@@ -223,7 +247,7 @@ export default function Layout() {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <ShieldAlert className="w-4 h-4 text-amber-300 flex-shrink-0" />
-                <span className="truncate">Quản trị Cấp cao</span>
+                <span className="truncate">Quản trị Hệ thống</span>
               </div>
               {isAdmin && (
                 <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse flex-shrink-0"></span>
@@ -242,7 +266,7 @@ export default function Layout() {
                   <div className="w-5 h-5 rounded-lg bg-blue-800 border border-blue-600 flex items-center justify-center text-blue-300 flex-shrink-0">
                     <HardDrive className="w-3 h-3" />
                   </div>
-                  <span className="text-[11px] font-bold text-white truncate">Google Drive Kho số</span>
+                  <span className="text-[11px] font-bold text-white truncate">Google Drive</span>
                 </div>
                 <ExternalLink className="w-3 h-3 text-blue-300 group-hover:text-white transition-colors flex-shrink-0" />
               </a>
@@ -461,6 +485,9 @@ export default function Layout() {
       
       {/* On-Demand AI Assistant Drawer */}
       <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
+
+      {/* Global Task & Document Deadline Toast Notifications */}
+      <TaskReminderToasts tasks={tasks} documents={documents} />
     </div>
   );
 }
