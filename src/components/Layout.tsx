@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Outlet, NavLink, useLocation, Link } from "react-router";
+import { Outlet, NavLink, useLocation, Link, useNavigate } from "react-router";
 import { logout, db } from "../lib/firebase";
 import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { useAuthStore, isSystemAdmin } from "../store/authStore";
@@ -18,14 +18,31 @@ import { cn } from "../lib/utils";
 const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY";
 
 export default function Layout() {
-  const { user } = useAuthStore();
+  const { user, setUser, logout: authStoreLogout } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [showNotifPopover, setShowNotifPopover] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   
   const isAdmin = isSystemAdmin(user);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Lỗi khi đăng xuất:", err);
+    } finally {
+      authStoreLogout();
+      setUser(null);
+      setIsLoggingOut(false);
+      navigate("/login", { replace: true });
+    }
+  };
 
   // Realtime notification sync for documents and tasks
   useEffect(() => {
@@ -103,10 +120,10 @@ export default function Layout() {
         
         {/* Navigation items */}
         <nav className="flex-1 py-4 px-3.5 overflow-y-auto space-y-4">
-          {/* Group 1: Operational Work */}
+          {/* Group 1: Core Operations */}
           <div className="space-y-1">
-            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Điều hành cốt lõi
+            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Điều hành & Tác nghiệp</span>
             </div>
 
             <NavLink
@@ -157,10 +174,11 @@ export default function Layout() {
             </NavLink>
           </div>
 
-          {/* Group 2: AI & GIS Decision Support */}
+          {/* Group 2: AI Intelligence & Advisory Center */}
           <div className="space-y-1 pt-2 border-t border-slate-100">
-            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Tham mưu Trí tuệ AI</span>
+            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Trí tuệ AI & Tham mưu</span>
+              <Sparkles className="w-3 h-3 text-amber-500" />
             </div>
 
             <NavLink
@@ -168,7 +186,7 @@ export default function Layout() {
               className={({ isActive }) => cn(
                 "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
                   : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
               )}
             >
@@ -203,19 +221,6 @@ export default function Layout() {
             </NavLink>
 
             <NavLink
-              to="/search"
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
-                isActive
-                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
-                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-              )}
-            >
-              <Search className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span className="truncate">Tra cứu Văn bản</span>
-            </NavLink>
-
-            <NavLink
               to="/map"
               className={({ isActive }) => cn(
                 "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
@@ -227,13 +232,31 @@ export default function Layout() {
               <MapPin className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate">Bản đồ Địa bàn</span>
             </NavLink>
-
-
           </div>
 
-          {/* Group 3: System Administration & Storage */}
+          {/* Group 3: Search & Knowledge Base */}
           <div className="space-y-1 pt-2 border-t border-slate-100">
-            <div className="px-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Tra cứu & Kho Tri thức</span>
+            </div>
+
+            <NavLink
+              to="/search"
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
+                isActive
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+              )}
+            >
+              <Search className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="truncate">Tra cứu & Kho Văn bản</span>
+            </NavLink>
+          </div>
+
+          {/* Group 4: System Administration & Storage */}
+          <div className="space-y-1 pt-2 border-t border-slate-100">
+            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
               <span>Hệ thống</span>
               {isAdmin && <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded text-[9px] font-black">ADMIN</span>}
             </div>
@@ -249,13 +272,12 @@ export default function Layout() {
             >
               <div className="flex items-center gap-3 min-w-0">
                 <ShieldAlert className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="truncate">Quản trị Hệ thống</span>
+                <span className="truncate">Bộ Não AI & Quản trị</span>
               </div>
               {isAdmin && (
                 <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping flex-shrink-0"></span>
               )}
             </NavLink>
-
           </div>
         </nav>
 
@@ -275,9 +297,10 @@ export default function Layout() {
               <div className="text-[10px] text-slate-500 truncate">{user?.email}</div>
             </div>
             <button 
-              onClick={logout} 
-              className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-              title="Đăng xuất"
+              onClick={handleLogout} 
+              disabled={isLoggingOut}
+              className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+              title="Đăng xuất khỏi hệ thống"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -460,13 +483,15 @@ export default function Layout() {
               <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </a>
 
-            {/* Mobile Logout Button */}
+            {/* Logout Button */}
             <button 
-              onClick={logout} 
-              className="md:hidden p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              onClick={handleLogout} 
+              disabled={isLoggingOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-transparent hover:border-red-100 disabled:opacity-50"
               title="Đăng xuất"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Đăng xuất</span>
             </button>
           </div>
         </header>

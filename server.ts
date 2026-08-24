@@ -580,27 +580,69 @@ app.post('/api/summarize-document', async (req, res) => {
   }
 });
 
-// General Chat / Advice endpoint
+// General Chat / Advice endpoint with Advanced Reasoning & Grounding
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, messages } = req.body;
+    const { message, messages, contextDocs, referenceDocs, tasks, brainBlueprint, contextDocument } = req.body;
     let promptText = '';
 
     const formattingRule = `
-YÊU CẦU ĐỊNH DẠNG CÂU TRẢ LỜI (RẤT QUAN TRỌNG):
-1. TRẢ LỜI NGẮN GỌN, CÔ ĐỌNG, SẮC BẤN: Đi thẳng vào bản chất vấn đề tham mưu, không trả lời dài dòng hay lặp lại.
+YÊU CẦU ĐỊNH DẠNG & VĂN PHONG THAM MƯU (BẮT BUỘC):
+1. TRẢ LỜI NGẮN GỌN, CÔ ĐỌNG, SẮC BÉN: Đi thẳng vào bản chất vấn đề tham mưu chiến lược, không trả lời dài dòng hay sao chép nguyên văn.
 2. BỐ CỤC PHÂN ĐOẠN RÕ RÀNG, DỄ ĐỌC:
-   - Chia câu trả lời thành các đề mục in đậm (ví dụ: **1. Đánh giá nhanh**, **2. Đề xuất xử lý**, **3. Phân công đôn đốc**).
-   - Mỗi đoạn văn không quá 2-3 câu, giữa các đoạn CÓ DÒNG TRỐNG để thông thoáng, dễ đọc.
+   - Chia câu trả lời thành các đề mục in đậm (ví dụ: **1. Đánh giá tình hình & Thẩm quyền**, **2. Phương án tham mưu đề xuất**, **3. Phân công chủ trì & Thời hạn hoàn thành**, **4. Căn cứ pháp lý & Lưu ý**).
+   - Mỗi đoạn văn ngắn từ 2-3 câu, giữa các đoạn CÓ DÒNG TRỐNG để thông thoáng, dễ đọc.
 3. DÙNG GẠCH ĐẦU DÒNG VÀ BÔI ĐẬM KEYWORD:
    - Sử dụng dấu gạch đầu dòng (-) cho từng ý tham mưu hoặc danh sách công việc.
-   - Bôi đậm (**từ khóa trọng tâm**) như tên đơn vị, thời hạn, cơ sở pháp lý.`;
+   - Bôi đậm (**từ khóa trọng tâm**) như tên đơn vị chủ trì, mốc thời gian hoàn thành, số hiệu văn bản, cơ sở pháp lý.
+4. NGUYÊN TẮC CÔNG TÁC CẤP ỦY & CHÍNH QUYỀN:
+   - Tuân thủ chặt chẽ Điều lệ Đảng, Quy chế làm việc của Đảng ủy, thẩm quyền Ban Thường vụ / Thường trực / UBND.
+   - Thể thức văn bản chuẩn theo Quy định số 66-QĐ/TW của Ban Bí thư (đối với văn bản Đảng) và Nghị định 30/2020/NĐ-CP (đối với văn bản hành chính Nhà nước).`;
+
+    let knowledgeContext = '';
+    if (referenceDocs && Array.isArray(referenceDocs) && referenceDocs.length > 0) {
+      knowledgeContext += `\n\n--- KHO TÀI LIỆU TRA CỨU & CĂN CỨ PHÁP LÝ ĐƯỢC NẠP SỐ HÓA ---\n` +
+        referenceDocs.slice(0, 10).map((rd: any, idx: number) => 
+          `[Tài liệu ${idx + 1}] Số: ${rd.documentNumber || 'N/A'} - Trích yếu: ${rd.title || rd.fileName} (Cơ quan: ${rd.issuer || 'N/A'})\nNội dung chính: ${rd.summary || rd.fullContent || 'N/A'}\nCăn cứ: ${(rd.legalBasis || []).join('; ')}`
+        ).join('\n---\n');
+    }
+
+    if (contextDocs && Array.isArray(contextDocs) && contextDocs.length > 0) {
+      knowledgeContext += `\n\n--- TÌNH HÌNH CÁC VĂN BẢN ĐẾN GẦN ĐÂY ---\n` +
+        contextDocs.slice(0, 10).map((d: any, idx: number) => 
+          `[VB ${idx + 1}] ${d.documentNumber ? `[${d.documentNumber}]` : ''} ${d.title || d.fileName} (Độ khẩn: ${d.urgency || 'Thường'}, Chủ trì: ${d.leadDepartment || 'Chưa giao'}, Hạn: ${d.actionDeadline || 'N/A'})`
+        ).join('\n');
+    }
+
+    if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+      knowledgeContext += `\n\n--- DANH MỤC NHIỆM VỤ ĐANG ĐÔN ĐỐC ---\n` +
+        tasks.slice(0, 10).map((t: any, idx: number) => 
+          `[Nhiệm vụ ${idx + 1}] ${t.title} - Phụ trách: ${t.assignedOrganization || t.assignee || 'Chưa giao'} - Hạn: ${t.dueDate || 'N/A'} - Trạng thái: ${t.status}`
+        ).join('\n');
+    }
+
+    if (contextDocument) {
+      knowledgeContext += `\n\n--- VĂN BẢN ĐANG XỬ LÝ TRỰC TIẾP ---\n` +
+        `Số: ${contextDocument.documentNumber || 'N/A'} | Trích yếu: ${contextDocument.title || contextDocument.fileName}\n` +
+        `Cơ quan ban hành: ${contextDocument.issuer || 'N/A'} | Độ khẩn: ${contextDocument.urgency || 'Thường'}\n` +
+        `Tóm tắt: ${contextDocument.summary || 'N/A'}\n` +
+        `Ý kiến tham mưu hiện tại: ${contextDocument.advisoryOpinion || 'N/A'}\n` +
+        `Đơn vị chủ trì: ${contextDocument.leadDepartment || 'N/A'} | Hạn hoàn thành: ${contextDocument.actionDeadline || 'N/A'}`;
+    }
+
+    if (brainBlueprint?.learnedRules && brainBlueprint.learnedRules.length > 0) {
+      knowledgeContext += `\n\n--- QUY TẮC MÁY HỌC ƯU TIÊN CỦA CƠ QUAN ---\n` +
+        brainBlueprint.learnedRules.map((r: any) => `- Khi gặp [${r.keywordTrigger}] -> Giao: ${r.suggestedLeadDept}, Đề xuất: ${r.suggestedAction}`).join('\n');
+    }
+
+    const systemPersona = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp cao của Văn phòng Cấp ủy và Chính quyền địa phương (Trợ lý Chánh Văn phòng & Ban Thường vụ Đảng ủy).
+Nhiệm vụ của bạn là tư vấn, phân tích văn bản, đề xuất phân luồng thẩm quyền, tổng hợp báo cáo điều hành, rà soát pháp lý, giải đáp vướng mắc quy chế và hỗ trợ soạn thảo ý kiến chỉ đạo sắc sảo, kịp thời, chuẩn xác tuyệt đối.`;
 
     if (message && typeof message === 'string' && message.trim()) {
-      promptText = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy và Chính quyền địa phương (Trợ lý Chánh Văn phòng cấp cao).
-Hãy hỗ trợ Chánh Văn phòng và Ban Thường vụ/Thường trực Đảng ủy một cách chuyên nghiệp, sắc bén, chính xác theo quy định Đảng và thể thức Nhà nước (Nghị định 30/2020/NĐ-CP).
+      promptText = `${systemPersona}
+${knowledgeContext}
 
-Nội dung yêu cầu / Câu hỏi:
+NỘI DUNG YÊU CẦU / CÂU HỎI TỪ LÃNH ĐẠO / CÁN BỘ:
 ${message.trim()}
 
 ${formattingRule}`;
@@ -609,10 +651,10 @@ ${formattingRule}`;
         .map(m => `${m.role === 'user' ? 'Cán bộ/Lãnh đạo' : 'Trợ lý Tham mưu'}: ${m.content}`)
         .join('\n\n');
 
-      promptText = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy và Chính quyền địa phương.
-Hãy hỗ trợ chuyên viên, chánh văn phòng và lãnh đạo một cách chuyên nghiệp, chính xác theo quy định Đảng và thể thức Nhà nước (Nghị định 30/2020/NĐ-CP).
+      promptText = `${systemPersona}
+${knowledgeContext}
 
-Nội dung hội thoại:
+TIẾN TRÌNH HỘI THOẠI:
 ${conversationHistory}
 
 ${formattingRule}`;
@@ -989,45 +1031,54 @@ app.post('/api/draft-directive', async (req, res) => {
       properties: {
         option1: {
           type: Type.STRING,
-          description: "Phương án 1: Văn phong Cương quyết, Kỷ cương hành động, giao việc cụ thể cho UBND, Công an, Khối Dân vận, Chi bộ khu phố. Phân rõ người, rõ trách nhiệm, rõ thời gian hoàn thành, tăng cường kiểm tra giám sát cấp ủy."
+          description: "Phương án 1: Trọng tâm - Quyết liệt - Kỷ cương. Gọn gàng, đanh thép, đi thẳng vào các chỉ đạo giao việc cho UBND phường, Công an, Mặt trận và Chi bộ khu phố. Rõ người, rõ việc, rõ thời hạn dứt khoát."
         },
         option2: {
           type: Type.STRING,
-          description: "Phương án 2: Văn phong Dân vận khéo, Tuyên truyền chính trị tư tưởng đi trước, khích lệ sự đồng thuận của nhân dân, phát huy vai trò nòng cốt của đảng viên và Mặt trận Tổ quốc."
+          description: "Phương án 2: Toàn diện - Đồng bộ Dân vận. Kết hợp kỷ cương hành chính và công tác chính trị tư tưởng, phát huy vai trò tiền phong gương mẫu của cấp ủy, đảng viên và sự đồng thuận của nhân dân."
         },
         styleDescription1: {
           type: Type.STRING,
-          description: "Mô tả ngắn gọn về đặc trưng văn phong Phương án 1 (Quyết liệt - Kỷ cương)."
+          description: "Mô tả ngắn gọn đặc trưng Phương án 1 (ví dụ: Quyết liệt - Rõ hạn định - Kỷ cương hành động)."
         },
         styleDescription2: {
           type: Type.STRING,
-          description: "Mô tả ngắn gọn về đặc trưng văn phong Phương án 2 (Dân vận - Tuyên truyền)."
+          description: "Mô tả ngắn gọn đặc trưng Phương án 2 (ví dụ: Đồng bộ Dân vận - Phát huy vai trò Chi bộ & Đoàn thể)."
         }
       },
       required: ['option1', 'option2', 'styleDescription1', 'styleDescription2']
     };
 
-    const promptText = `Bạn là Bí thư Đảng ủy phường kiên trung, bản lĩnh, am hiểu sâu sắc Quy chế làm việc Cấp ủy, Điều lệ Đảng, Quy định công tác văn thư Đảng và **Hướng dẫn số 05-HD/VPTW** (Về thể thức và kỹ thuật trình bày văn bản của Đảng), cùng kho tri thức từ Bộ não chung Drive của cơ quan.
+    const promptText = `Bạn là Bí thư Đảng ủy phường - Người đứng đầu Cấp ủy lãnh đạo toàn diện hệ thống chính trị cơ sở phường (bao gồm Đảng ủy, Chính quyền UBND phường, Ủy ban MTTQ và các Đoàn thể, Công an, Quân sự và Chi bộ 100% các khu phố).
 
-Nhiệm vụ: Căn cứ vào ý tưởng/nhiệm vụ chỉ đạo nguồn:
+Nhiệm vụ: Căn cứ vào ý tưởng/nội dung chỉ đạo:
 "${idea}"
 
-Dạng văn bản yêu cầu: ${docTypeTitle}
+Hình thức văn bản: ${docTypeTitle}
+${stylePreference ? `Văn phong mong muốn: "${stylePreference}".` : ''}
+${matchedResolutions && matchedResolutions.length > 0 ? `Căn cứ Nghị quyết cấp trên: "${matchedResolutions.join(', ')}".` : ''}
 
-${stylePreference ? `Lưu ý văn phong ưu tiên của Lãnh đạo: "${stylePreference}".` : ''}
-${matchedResolutions && matchedResolutions.length > 0 ? `Căn cứ pháp lý & Nghị quyết cấp trên: "${matchedResolutions.join(', ')}".` : ''}
+NGUYÊN TẮC SOẠN THẢO Ý KIẾN KẾT LUẬN & CHỈ ĐẠO CỦA BÍ THƯ ĐẢNG ỦY PHƯỜNG:
+1. GỌN HƠN, TẬP TRUNG HƠN, KHÔNG SÁO RỖNG:
+   - Tránh văn hoa dài dòng; đi thẳng vào giải quyết vấn đề cốt lõi.
+   - Sử dụng ngôn từ chuẩn xác, đanh thép, mang tính quyết sách và phân công trách nhiệm rõ ràng.
 
-YÊU CẦU THỂ THỨC & NỘI DUNG NGHỆ THUẬT LÃNH ĐẠO:
-1. Đúng vị thế Bí thư Đảng ủy phường và chuẩn mực theo Hướng dẫn 05-HD/VPTW: Thể hiện tư tưởng chỉ đạo toàn diện, nhất quán của Đảng ủy đối với toàn bộ hệ thống chính trị phường (Chính quyền UBND, Mặt trận - Đoàn thể, Công an, Cấp ủy Chi bộ khu phố).
-2. Kết cấu chuẩn mực của văn bản Cấp ủy Đảng:
-   - Đánh giá khái quát tình hình / Bối cảnh yêu cầu nhiệm vụ.
-   - Các giải pháp chỉ đạo trọng tâm (Nêu rõ: UBND phường làm gì, Khối Dân vận - Mặt trận vận động ra sao, Chi bộ khu phố phân công đảng viên như thế nào).
-   - Phân công tổ chức thực hiện, chế độ báo cáo và công tác kiểm tra, giám sát của Ủy ban Kiểm tra Đảng ủy / Thường trực Đảng ủy.
-3. Câu chữ súc tích, đanh thép, mang tính chỉ đạo trực tiếp ("Đảng ủy phường yêu cầu...", "Bí thư Đảng ủy giao...", "Đề nghị UBND phường...", "Yêu cầu các chi bộ khu phố...").
+2. ĐÚNG VỊ THẾ & QUYỀN HẠN CỦA BÍ THƯ ĐẢNG ỦY PHƯỜNG:
+   - "Đảng ủy / Ban Thường vụ Đảng ủy yêu cầu..."
+   - "Giao UBND phường (đồng chí Chủ tịch UBND chỉ đạo)..."
+   - "Giao Công an phường phối hợp chặt chẽ..."
+   - "Đề nghị Khối Dân vận, Ủy ban MTTQ và các đoàn thể chính trị - xã hội..."
+   - "Yêu cầu Cấp ủy các Chi bộ khu phố phân công đảng viên..."
+   - "Giao Văn phòng Đảng ủy phối hợp UBKT Đảng ủy đôn đốc, báo cáo..."
 
-Hãy tạo 02 phương án hoàn chỉnh:
-- Phương án 1 (Kỷ cương hành động, giao việc quyết liệt theo chuẩn Hướng dẫn 05-HD/VPTW): Rõ đơn vị chủ trì, rõ mốc thời gian hoàn thành, nêu cao trách nhiệm người đứng đầu, tăng cường kiểm tra xử lý vi phạm.
-- Phương án 2 (Dân vận khéo, vận động quần chúng): Nhấn mạnh công tác tư tưởng, vai trò gương mẫu của cán bộ đảng viên, sự phối hợp Mặt trận - các đoàn thể vận động nhân dân đồng thuận.`;
+3. KẾT CẤU GỌN GÀNG (3 PHẦN CÔ ĐỌNG):
+   - I. ĐÁNH GIÁ & TINH THẦN CHUNG: 1-2 câu nêu rõ tính cấp thiết và quyết tâm chính trị.
+   - II. NHIỆM VỤ CHỈ ĐẠO TRỌNG TÂM: Các đầu việc phân công dứt khoát theo từng khối cơ quan (UBND, Công an, Dân vận - Mặt trận, Chi bộ khu phố).
+   - III. TỔ CHỨC THỰC HIỆN & THỜI HẠN: Thời hạn báo cáo kết quả cụ thể về Thường trực Đảng ủy.
+
+Hãy tạo 02 phương án ngắn gọn, tập trung cao độ, chuẩn văn phong lãnh đạo Cấp ủy:
+- Phương án 1 (Quyết liệt - Rõ việc - Kỷ cương): Tập trung giao việc hành động ngay, thời hạn dứt khoát, tăng cường xử lý vi phạm và kiểm tra trách nhiệm người đứng đầu.
+- Phương án 2 (Đồng bộ - Dân vận khéo): Kết hợp xử lý hành chính với công tác tuyên truyền, vận động quần chúng và phát huy tính nêu gương của từng chi bộ, đảng viên.`;
 
     const response = await generateContentWithFallback({
       contents: [{ text: promptText }],
@@ -1225,6 +1276,9 @@ Trả về định dạng JSON theo đúng schema.`
     }
   } catch (err: any) {
     console.error("Audit document error:", err);
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
     res.status(500).json({ error: err.message || 'Lỗi rà soát văn bản hành chính.' });
   }
 });
@@ -1484,6 +1538,9 @@ Nhiệm vụ:
     }
   } catch (err: any) {
     console.error("Multimodal analysis error:", err);
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (_) {}
+    }
     res.status(500).json({ error: err.message || 'Lỗi phân tích đa phương thức.' });
   }
 });

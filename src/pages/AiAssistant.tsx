@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Bot, Send, ShieldAlert, CheckCircle2, FileText, Clock, 
-  ChevronRight, ArrowRight, RefreshCw, Lightbulb, AlertTriangle, 
-  CheckSquare, Users, Building2, Download, Printer, Play, Pause, Volume2, ShieldCheck, Cpu, Search, Link2, Database,
+  ChevronRight, ArrowRight, RefreshCw, AlertTriangle, 
+  CheckSquare, Users, Building2, Play, Pause, Volume2, ShieldCheck, Link2,
   Calendar, Eye
 } from 'lucide-react';
 import { db, collection, getDocs, query, orderBy, limit } from '../lib/firebase';
@@ -16,7 +16,7 @@ export default function AiAssistant() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage' | 'drafting'>('briefing');
+  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage'>('briefing');
   
   const [chatQuery, setChatQuery] = useState('');
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
@@ -95,20 +95,26 @@ export default function AiAssistant() {
     if (!queryText || isGenerating) return;
 
     if (!presetQuery) setChatQuery('');
-    setChatHistory(prev => [...prev, { role: 'user', content: queryText }]);
+    const newChatHistory = [...chatHistory, { role: 'user' as const, content: queryText }];
+    setChatHistory(newChatHistory);
     setIsGenerating(true);
 
     try {
-      const contextData = {
-        docsSummary: documents.slice(0, 10).map(d => ({ id: d.id, title: d.title, leadDept: d.leadDepartment, urgency: d.urgency })),
-        tasksSummary: tasks.slice(0, 10).map(t => ({ title: t.title, dept: t.assignedOrganization, status: t.status, dueDate: t.dueDate }))
-      };
+      const refDocs = documents.filter(d => 
+        d.isReferenceDoc || 
+        (d.tags || []).includes('TRA_CUU_THAM_KHAO') || 
+        (d.tags || []).includes('Văn bản tra cứu') || 
+        !!d.referenceCategory
+      );
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Hỏi đáp Chánh Văn phòng Đảng ủy. Dữ liệu hệ thống hiện tại: ${JSON.stringify(contextData)}. Câu hỏi của Chánh VP: "${queryText}". Hãy trả lời với tư cách Trợ lý Chánh Văn phòng cấp cao, đưa ra tham mưu chính xác, chính quy và đúng quy chế làm việc.`
+          messages: newChatHistory,
+          contextDocs: documents.slice(0, 10),
+          referenceDocs: refDocs.slice(0, 8),
+          tasks: tasks.slice(0, 10)
         })
       });
 
@@ -502,17 +508,6 @@ export default function AiAssistant() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: DRAFTING */}
-      {activeTab === 'drafting' && (
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6 text-center py-16">
-          <Cpu className="w-12 h-12 text-blue-600 mx-auto animate-bounce" />
-          <div className="max-w-md mx-auto space-y-2">
-            <h3 className="text-lg font-black text-slate-900">Trung tâm Soạn thảo & Chỉ đạo AI Nâng cao</h3>
-            <p className="text-xs text-slate-500">Tính năng này đã được tích hợp trực tiếp vào phân hệ "Soạn Chỉ đạo AI" và "Rà soát Thể thức" trên thanh điều hướng để đảm bảo tốc độ xử lý tối ưu.</p>
           </div>
         </div>
       )}

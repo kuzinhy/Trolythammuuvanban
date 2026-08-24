@@ -10,7 +10,7 @@ import {
 import { Document, Task } from '../types';
 import DispatchSlip from '../components/DispatchSlip';
 import DraftGenerator from '../components/DraftGenerator';
-import { getDocumentProgressStatus } from './DocumentList';
+import { getDocumentProgressStatus } from '../lib/documentUtils';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 import { getActiveLearningRules, saveLearnedAdjustmentRule, matchTextAgainstLearnedRules, type LearningRule } from '../lib/learningEngine';
 

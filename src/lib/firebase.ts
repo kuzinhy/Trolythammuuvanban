@@ -98,10 +98,16 @@ export const setCachedAccessToken = (token: string | null) => {
 };
 
 export const logout = async () => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.debug("Sign out error:", err);
+  }
   cachedAccessToken = null;
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem('gdrive_access_token');
+    sessionStorage.removeItem('trolycvp_user');
+    localStorage.removeItem('trolycvp_user');
   }
 };
 

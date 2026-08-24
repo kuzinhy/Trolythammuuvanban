@@ -1,45 +1,40 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, MouseEvent } from 'react';
 import { collection, query, orderBy, onSnapshot, limit, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Document } from '../types';
 import { 
   Eye, Loader2, Search, Plus, Printer, ShieldAlert, 
   HardDrive, ExternalLink, Clock, AlertTriangle, CheckCircle2, Calendar, Tag,
-  FileText, Check, X, ShieldCheck, Filter
+  FileText, Check, X, ShieldCheck, Filter, Star, User
 } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import { useAuthStore } from '../store/authStore';
 import DispatchSlip from '../components/DispatchSlip';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
-import { getDocumentProgressStatus } from '../lib/documentUtils';
-export { getDocumentProgressStatus };
+import { getDocumentProgressStatus, parseDateString } from '../lib/documentUtils';
 
-export type ProgressFilter = 'ALL' | 'OVERDUE' | 'DUE_TODAY' | 'IN_TIME' | 'STANDING_BOARD' | 'URGENT' | 'DRIVE';
-
-export function parseDateString(dateStr: string | null | undefined): Date | null {
-  if (!dateStr) return null;
-  const str = dateStr.trim();
-  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-  if (ymdMatch) {
-    return new Date(parseInt(ymdMatch[1], 10), parseInt(ymdMatch[2], 10) - 1, parseInt(ymdMatch[3], 10));
-  }
-  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (dmyMatch) {
-    return new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10));
-  }
-  const parsed = new Date(str);
-  return isNaN(parsed.getTime()) ? null : parsed;
-}
-
-
+export type ProgressFilter = 'ALL' | 'IMPORTANT' | 'MY_UPLOADS' | 'COMPLETED' | 'OVERDUE' | 'DUE_TODAY' | 'IN_TIME' | 'STANDING_BOARD' | 'URGENT' | 'DRIVE';
 
 export default function DocumentList() {
+  const { user } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filterType, setFilterType] = useState<ProgressFilter>('ALL');
+  
+  const initialFilter = (searchParams.get('filter') as ProgressFilter) || 'ALL';
+  const [filterType, setFilterType] = useState<ProgressFilter>(initialFilter);
   const [selectedSlipDoc, setSelectedSlipDoc] = useState<Document | null>(null);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('ALL');
+  const [starTogglingId, setStarTogglingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const urlFilter = searchParams.get('filter') as ProgressFilter;
+    if (urlFilter && urlFilter !== filterType) {
+      setFilterType(urlFilter);
+    }
+  }, [searchParams]);
 
   const [deputyChiefs] = useState<string[]>(() => {
     const saved = localStorage.getItem('trolycvp_officers');
@@ -57,6 +52,25 @@ export default function DocumentList() {
       'Đ/c Hoàng Văn Nam - Phó Chánh VP'
     ];
   });
+
+  const handleToggleStar = async (e: MouseEvent, docItem: Document) => {
+    e.stopPropagation();
+    if (!docItem.id) return;
+    
+    setStarTogglingId(docItem.id);
+    const newStatus = !(docItem.isImportant || docItem.isStarred);
+    
+    try {
+      await updateDoc(doc(db, 'documents', docItem.id), {
+        isImportant: newStatus,
+        isStarred: newStatus,
+      });
+    } catch (err) {
+      console.error("Lỗi khi cập nhật trạng thái quan trọng:", err);
+    } finally {
+      setStarTogglingId(null);
+    }
+  };
 
   const handleUpdateDeputyChief = async (docId: string, deputy: string) => {
     try {
@@ -125,6 +139,20 @@ export default function DocumentList() {
 
       const status = getDocumentProgressStatus(doc);
 
+      if (filterType === 'IMPORTANT') {
+        const u = (doc.urgency || '').toUpperCase();
+        const isUrgent = u.includes('HOA_TOC') || u.includes('HỎA TỐC') || u.includes('THUONG_KHAN') || u.includes('THƯỢNG KHẨN') || u.includes('KHẨN');
+        const isStanding = (doc.proposedAction || '').includes('Ban Thường vụ') || (doc.proposedAction || '').includes('Thường trực');
+        return !!(doc.isImportant || doc.isStarred || isUrgent || isStanding);
+      }
+      if (filterType === 'MY_UPLOADS') {
+        if (!user) return !!doc.createdBy;
+        return doc.createdBy === user.uid || (!!doc.uploadedByEmail && doc.uploadedByEmail === user.email);
+      }
+      if (filterType === 'COMPLETED') {
+        const procResult = (doc.processingResult || '').toUpperCase();
+        return procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || doc.status === 'COMPLETED';
+      }
       if (filterType === 'OVERDUE') {
         return status.type === 'OVERDUE';
       }
@@ -145,30 +173,51 @@ export default function DocumentList() {
       }
       return true;
     });
-  }, [documents, debouncedSearch, filterType, selectedTagFilter]);
+  }, [documents, debouncedSearch, filterType, selectedTagFilter, user]);
 
   const progressCounts = useMemo(() => {
     let overdue = 0;
     let dueToday = 0;
     let inTime = 0;
+    let completed = 0;
     let standingBoard = 0;
     let driveCount = 0;
+    let importantCount = 0;
+    let myUploadsCount = 0;
 
     for (const d of documents) {
+      const procResult = (d.processingResult || '').toUpperCase();
+      const isDocCompleted = procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || d.status === 'COMPLETED';
+      if (isDocCompleted) completed++;
+
       const st = getDocumentProgressStatus(d);
       if (st.type === 'OVERDUE') overdue++;
       else if (st.type === 'DUE_TODAY') dueToday++;
       else if (st.type === 'DUE_SOON' || st.type === 'IN_TIME') inTime++;
 
-      if ((d.proposedAction || '').includes('Ban Thường vụ') || (d.proposedAction || '').includes('Thường trực') || (d.proposedAction || '').includes('Bí thư')) {
+      const u = (d.urgency || '').toUpperCase();
+      const isUrgent = u.includes('HOA_TOC') || u.includes('HỎA TỐC') || u.includes('THUONG_KHAN') || u.includes('THƯỢNG KHẨN') || u.includes('KHẨN');
+      const isStanding = (d.proposedAction || '').includes('Ban Thường vụ') || (d.proposedAction || '').includes('Thường trực');
+      
+      if (d.isImportant || d.isStarred || isUrgent || isStanding) {
+        importantCount++;
+      }
+
+      if (user && (d.createdBy === user.uid || (d.uploadedByEmail && d.uploadedByEmail === user.email))) {
+        myUploadsCount++;
+      } else if (!user && d.createdBy) {
+        myUploadsCount++;
+      }
+
+      if (isStanding || (d.proposedAction || '').includes('Bí thư')) {
         standingBoard++;
       }
       if (d.driveFileId || d.driveUrl) {
         driveCount++;
       }
     }
-    return { overdue, dueToday, inTime, standingBoard, driveCount };
-  }, [documents]);
+    return { overdue, dueToday, inTime, completed, standingBoard, driveCount, importantCount, myUploadsCount };
+  }, [documents, user]);
 
   if (loading) {
     return (
@@ -321,6 +370,30 @@ export default function DocumentList() {
             </button>
 
             <button
+              onClick={() => setFilterType('IMPORTANT')}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
+                filterType === 'IMPORTANT'
+                  ? 'bg-amber-500 text-white shadow-2xs'
+                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${filterType === 'IMPORTANT' ? 'fill-white text-white' : 'fill-amber-500 text-amber-500'}`} />
+              <span>Quan trọng ({progressCounts.importantCount})</span>
+            </button>
+
+            <button
+              onClick={() => setFilterType('MY_UPLOADS')}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
+                filterType === 'MY_UPLOADS'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-indigo-50 text-indigo-900 hover:bg-indigo-100 border border-indigo-200'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Tôi tải lên ({progressCounts.myUploadsCount})</span>
+            </button>
+
+            <button
               onClick={() => setFilterType('STANDING_BOARD')}
               className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
                 filterType === 'STANDING_BOARD'
@@ -359,14 +432,26 @@ export default function DocumentList() {
             </button>
 
             <button
-              onClick={() => setFilterType('IN_TIME')}
+              onClick={() => setFilterType('COMPLETED')}
               className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
-                filterType === 'IN_TIME'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                filterType === 'COMPLETED'
+                  ? 'bg-emerald-700 text-white shadow-2xs font-bold'
+                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Đã xong ({progressCounts.completed})</span>
+            </button>
+
+            <button
+              onClick={() => setFilterType('IN_TIME')}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 ${
+                filterType === 'IN_TIME'
+                  ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                  : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-blue-600" />
               <span>Trong hạn ({progressCounts.inTime})</span>
             </button>
 
@@ -437,11 +522,27 @@ export default function DocumentList() {
                 return (
                   <tr key={doc.id} className="hover:bg-blue-50/40 transition-colors group">
                     
-                    {/* Số / Ký hiệu */}
+                    {/* Số / Ký hiệu & Đánh dấu sao */}
                     <td className="px-5 py-3.5 whitespace-nowrap align-top">
-                      <div className="font-extrabold text-blue-950 text-xs">{doc.documentNumber || 'Đang cập nhật'}</div>
-                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">{doc.issuedDate || 'Ngày: N/A'}</div>
-                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleStar(e, doc)}
+                          disabled={starTogglingId === doc.id}
+                          className="p-1 rounded-md hover:bg-amber-100 text-slate-300 hover:text-amber-500 transition-colors cursor-pointer"
+                          title={(doc.isImportant || doc.isStarred) ? "Bỏ đánh dấu quan trọng" : "Đánh dấu quan trọng"}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${(doc.isImportant || doc.isStarred) ? 'fill-amber-500 text-amber-500' : ''}`} />
+                        </button>
+                        <div className="font-extrabold text-blue-950 text-xs">{doc.documentNumber || 'Đang cập nhật'}</div>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5 ml-5">{doc.issuedDate || 'Ngày: N/A'}</div>
+                      <div className="flex flex-wrap items-center gap-1 mt-1 ml-5">
+                        {(doc.isImportant || doc.isStarred) && (
+                          <span className="inline-block px-1.5 py-0.2 bg-amber-100 text-amber-800 text-[9px] font-black rounded border border-amber-200">
+                            ⭐ Quan trọng
+                          </span>
+                        )}
                         {doc.urgency && doc.urgency !== 'Thường' && (
                           <span className="inline-block px-1.5 py-0.2 bg-red-100 text-red-800 text-[9px] font-black rounded border border-red-200">
                             {doc.urgency}
@@ -451,6 +552,12 @@ export default function DocumentList() {
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold rounded">
                             <HardDrive className="w-2.5 h-2.5" />
                             Drive
+                          </span>
+                        )}
+                        {doc.uploadedByName && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-100 text-[9px] font-medium rounded">
+                            <User className="w-2 h-2" />
+                            {doc.uploadedByName}
                           </span>
                         )}
                       </div>

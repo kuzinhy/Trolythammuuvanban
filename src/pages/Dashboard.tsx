@@ -11,6 +11,8 @@ import { db, getAccessToken, requestDriveAccess } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { Document, Task } from '../types';
 import { TaskReminderToasts, TaskReminderAlertBanner } from '../components/TaskReminderToasts';
+import ImportantDocumentsSection from '../components/ImportantDocumentsSection';
+import DocumentProgressChart from '../components/DocumentProgressChart';
 
 const TARGET_DRIVE_FOLDER_ID = '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
 const TARGET_DRIVE_FOLDER_URL = `https://drive.google.com/drive/folders/${TARGET_DRIVE_FOLDER_ID}`;
@@ -90,7 +92,20 @@ export default function Dashboard() {
     };
   }, [allDocs, allTasks]);
 
-  const recentDocs = useMemo(() => allDocs.slice(0, 6), [allDocs]);
+  const [recentDocFilter, setRecentDocFilter] = useState<'ALL' | 'STANDING_BOARD' | 'URGENT' | 'DRIVE'>('ALL');
+
+  const filteredRecentDocs = useMemo(() => {
+    let filtered = allDocs;
+    if (recentDocFilter === 'STANDING_BOARD') {
+      filtered = filtered.filter(d => d.proposedAction?.includes('Ban Thường vụ') || d.proposedAction?.includes('Thường trực'));
+    } else if (recentDocFilter === 'URGENT') {
+      filtered = filtered.filter(d => d.urgency && d.urgency !== 'Thường');
+    } else if (recentDocFilter === 'DRIVE') {
+      filtered = filtered.filter(d => d.driveFileId || d.driveUrl);
+    }
+    return filtered.slice(0, 7);
+  }, [allDocs, recentDocFilter]);
+
   const recentTasks = useMemo(() => allTasks.slice(0, 5), [allTasks]);
 
   const handleConnectDrive = useCallback(async () => {
@@ -150,6 +165,16 @@ export default function Dashboard() {
 
       setUploadStep('Đang lưu trữ hồ sơ dịch vụ công...');
 
+      const isAutoImportant = (
+        data.analysis?.urgency === 'HOA_TOC' || 
+        data.analysis?.urgency === 'THUONG_KHAN' || 
+        (data.analysis?.urgency || '').toLowerCase().includes('khẩn') || 
+        (data.analysis?.urgency || '').toLowerCase().includes('hỏa tốc') ||
+        (data.analysis?.proposedAction || '').includes('Ban Thường vụ') || 
+        (data.analysis?.proposedAction || '').includes('Thường trực') ||
+        false
+      );
+
       const docRef = await addDoc(collection(db, 'documents'), {
         ...data.analysis,
         driveFileId: data.driveFileId || null,
@@ -160,6 +185,10 @@ export default function Dashboard() {
         mimeType: data.mimeType || file.type,
         status: 'ANALYZED',
         createdBy: user?.uid || null,
+        uploadedByName: user?.displayName || user?.email?.split('@')[0] || 'Người dùng',
+        uploadedByEmail: user?.email || null,
+        isImportant: isAutoImportant,
+        isStarred: isAutoImportant,
         createdAt: serverTimestamp(),
       });
 
@@ -306,12 +335,26 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Featured Important User-Uploaded Documents Section */}
+      <ImportantDocumentsSection 
+        documents={allDocs}
+        onUploadClick={() => {
+          const el = document.getElementById('upload-dropzone-box');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+      />
+
+      {/* Recharts-Powered Comprehensive Document Workflow & Deadline Statistics Chart */}
+      <DocumentProgressChart documents={allDocs} tasks={allTasks} />
+
       {/* Main Grid: Upload & Recent Dispatches */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Upload Dropzone & Google Drive Connection Info */}
         <div className="lg:col-span-1 space-y-6">
           {/* Upload Box */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+          <div id="upload-dropzone-box" className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4 scroll-mt-24">
             <div>
               <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-blue-600" />
@@ -464,60 +507,119 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           {/* Recent Documents Card */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80">
               <div>
-                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Văn bản Mới Tiếp Nhận & Phân Luồng</h3>
+                <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span>Văn bản Mới Tiếp Nhận & Phân Luồng</span>
+                </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">Danh sách hồ sơ công văn đã thẩm định tự động</p>
               </div>
-              <Link to="/documents" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                <span>Xem tất cả</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setRecentDocFilter('ALL')}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                    recentDocFilter === 'ALL'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  Tất cả ({allDocs.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecentDocFilter('STANDING_BOARD')}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                    recentDocFilter === 'STANDING_BOARD'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  Trình BTV ({stats.standingBoardDocs})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecentDocFilter('URGENT')}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                    recentDocFilter === 'URGENT'
+                      ? 'bg-red-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  Khẩn ({stats.urgentDocs})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecentDocFilter('DRIVE')}
+                  className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                    recentDocFilter === 'DRIVE'
+                      ? 'bg-sky-600 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  }`}
+                >
+                  Drive ({stats.driveSyncedDocs})
+                </button>
+                
+                <Link to="/documents" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 ml-1">
+                  <span>Toàn bộ</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
 
             <div className="divide-y divide-slate-100">
-              {recentDocs.length === 0 ? (
+              {filteredRecentDocs.length === 0 ? (
                 <div className="p-12 text-center text-xs text-slate-400">
-                  Chưa có văn bản nào trong hệ thống. Hãy kéo thả văn bản ở trên để bắt đầu!
+                  Không có văn bản nào phù hợp với bộ lọc đã chọn.
                 </div>
               ) : (
-                recentDocs.map((doc) => (
+                filteredRecentDocs.map((doc) => (
                   <div
                     key={doc.id}
                     onClick={() => navigate(`/documents/${doc.id}`)}
-                    className="p-4 hover:bg-slate-50/80 cursor-pointer transition-colors flex items-center justify-between gap-4 group"
+                    className="p-3.5 sm:p-4 hover:bg-blue-50/40 cursor-pointer transition-colors flex items-center justify-between gap-4 group"
                   >
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="text-[11px] font-bold text-slate-900">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="text-[11px] font-black text-slate-900">
                             {doc.documentNumber || 'Số: Đang cập nhật'}
                           </span>
+                          {doc.urgency && doc.urgency !== 'Thường' && (
+                            <span className="px-1.5 py-0.2 bg-red-100 text-red-800 text-[9px] font-black rounded border border-red-200">
+                              {doc.urgency}
+                            </span>
+                          )}
                           {doc.proposedAction && (
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded border border-blue-100 truncate max-w-[200px]">
+                            <span className="px-2 py-0.2 bg-blue-50 text-blue-800 text-[10px] font-bold rounded border border-blue-100 truncate max-w-[200px]">
                               {doc.proposedAction}
                             </span>
                           )}
                           {doc.leadDepartment && (
-                            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded truncate max-w-[150px]">
+                            <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 text-[10px] font-medium rounded truncate max-w-[150px]">
                               Chủ trì: {doc.leadDepartment}
                             </span>
                           )}
                           {(doc.driveFileId || doc.driveUrl) && (
-                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold rounded flex items-center gap-1">
+                            <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold rounded flex items-center gap-1">
                               <HardDrive className="w-2.5 h-2.5" />
                               Drive
                             </span>
                           )}
                         </div>
-                        <h4 className="text-xs font-semibold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                        <h4 className="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-blue-600 transition-colors">
                           {doc.title || doc.fileName}
                         </h4>
-                        <div className="text-[11px] text-slate-400 mt-0.5 truncate">
-                          {doc.issuer ? `Cơ quan ban hành: ${doc.issuer}` : doc.fileName}
+                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 truncate">
+                          <span>{doc.issuer ? `Cơ quan: ${doc.issuer}` : doc.fileName}</span>
+                          {doc.actionDeadline && (
+                            <span className="text-blue-600 font-semibold">• Hạn: {doc.actionDeadline}</span>
+                          )}
                         </div>
                       </div>
                     </div>

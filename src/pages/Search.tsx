@@ -1,14 +1,16 @@
-import { useState, useRef, useCallback, useEffect, type FormEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, type FormEvent } from 'react';
 import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
   Search as SearchIcon, Loader2, FileText, ChevronRight, HardDrive, 
-  Sparkles, Filter, ExternalLink, Printer, ShieldAlert, BookOpen, CheckCircle2, Tag 
+  Sparkles, Filter, ExternalLink, Printer, ShieldAlert, BookOpen, CheckCircle2, Tag,
+  FolderOpen, Layers, Star, User
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Document } from '../types';
 import DispatchSlip from '../components/DispatchSlip';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
+import SearchKnowledgeUploadZone from '../components/SearchKnowledgeUploadZone';
 
 interface AISearchResult {
   aiAnswerSummary: string;
@@ -33,22 +35,44 @@ export default function Search() {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterAuthority, setFilterAuthority] = useState<string>('ALL');
   const [filterDriveOnly, setFilterDriveOnly] = useState<boolean>(false);
+  const [filterReferenceOnly, setFilterReferenceOnly] = useState<boolean>(false);
 
+  const [poolDocs, setPoolDocs] = useState<Document[]>([]);
   const cachedDocsRef = useRef<Document[] | null>(null);
   const navigate = useNavigate();
 
-  // Load candidate documents pool on mount into ref cache
+  // Load candidate documents pool on mount into ref cache & state
   useEffect(() => {
     const fetchPool = async () => {
       try {
         const q = query(collection(db, 'documents'), orderBy('createdAt', 'desc'), limit(300));
         const snapshot = await getDocs(q);
-        cachedDocsRef.current = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Document));
+        cachedDocsRef.current = docs;
+        setPoolDocs(docs);
       } catch (e) {
         console.error("Error caching documents for search:", e);
       }
     };
     fetchPool();
+  }, []);
+
+  const referenceDocsCount = useMemo(() => {
+    return poolDocs.filter(d => 
+      d.isReferenceDoc || 
+      (d.tags || []).includes('TRA_CUU_THAM_KHAO') || 
+      (d.tags || []).includes('Văn bản tra cứu') ||
+      !!d.referenceCategory
+    ).length;
+  }, [poolDocs]);
+
+  const handleDocumentAdded = useCallback((newDoc: Document) => {
+    setPoolDocs(prev => [newDoc, ...prev]);
+    if (cachedDocsRef.current) {
+      cachedDocsRef.current = [newDoc, ...cachedDocsRef.current];
+    }
+    setResults(prev => [newDoc, ...prev]);
+    setHasSearched(true);
   }, []);
 
   const performKeywordFilter = useCallback((docs: Document[], rawTerm: string) => {
@@ -69,11 +93,12 @@ export default function Search() {
       const matchLegalBasis = (data.legalBasis || []).some(lb => lb.toLowerCase().includes(term));
       const matchOrgs = (data.organizations || []).some(org => org.toLowerCase().includes(term));
       const matchPersons = (data.persons || []).some(person => person.toLowerCase().includes(term));
+      const matchTags = (data.tags || []).some(t => t.toLowerCase().includes(term));
 
       return (
         matchNumber || matchTitle || matchFileName || matchSummary || matchFullContent ||
         matchProposed || matchLead || matchIssuer || matchKeywords || matchDirectives ||
-        matchLegalBasis || matchOrgs || matchPersons
+        matchLegalBasis || matchOrgs || matchPersons || matchTags
       );
     });
   }, []);
@@ -147,9 +172,14 @@ export default function Search() {
     handleSearch(undefined, chip);
   };
 
-  // Apply Secondary Filters (Authority, Type, Drive)
+  // Apply Secondary Filters (Authority, Type, Drive, Reference)
   const displayResults = results.filter(doc => {
     if (filterDriveOnly && !doc.driveFileId && !doc.driveUrl) return false;
+
+    if (filterReferenceOnly) {
+      const isRef = doc.isReferenceDoc || (doc.tags || []).includes('TRA_CUU_THAM_KHAO') || (doc.tags || []).includes('Văn bản tra cứu') || !!doc.referenceCategory;
+      if (!isRef) return false;
+    }
 
     if (filterAuthority === 'STANDING_BOARD') {
       if (!doc.proposedAction?.includes('Ban Thường vụ') && !doc.proposedAction?.includes('Thường trực')) return false;
@@ -168,6 +198,15 @@ export default function Search() {
     return true;
   });
 
+  const recentReferenceDocs = useMemo(() => {
+    return poolDocs.filter(d => 
+      d.isReferenceDoc || 
+      (d.tags || []).includes('TRA_CUU_THAM_KHAO') || 
+      (d.tags || []).includes('Văn bản tra cứu') ||
+      !!d.referenceCategory
+    ).slice(0, 6);
+  }, [poolDocs]);
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 font-sans transform-gpu pb-12">
       {/* Header */}
@@ -180,7 +219,7 @@ export default function Search() {
             </span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tìm kiếm theo nội dung chi tiết trong tệp Google Drive, số hiệu, căn cứ pháp lý hoặc truy vấn bằng câu hỏi tự nhiên.
+            Tìm kiếm theo nội dung chi tiết trong tệp Google Drive, số hiệu, căn cứ pháp lý, tài liệu tra cứu hoặc truy vấn bằng câu hỏi tự nhiên.
           </p>
         </div>
 
@@ -188,7 +227,7 @@ export default function Search() {
         <div className="bg-slate-100 p-1 rounded-xl flex text-xs font-bold shadow-2xs">
           <button
             onClick={() => setSearchMode('FULL_TEXT')}
-            className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
               searchMode === 'FULL_TEXT' 
                 ? 'bg-white text-blue-700 shadow-2xs font-extrabold' 
                 : 'text-slate-600 hover:text-slate-900'
@@ -199,7 +238,7 @@ export default function Search() {
           </button>
           <button
             onClick={() => setSearchMode('AI_SEMANTIC')}
-            className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
               searchMode === 'AI_SEMANTIC' 
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xs font-extrabold' 
                 : 'text-slate-600 hover:text-slate-900'
@@ -210,6 +249,12 @@ export default function Search() {
           </button>
         </div>
       </div>
+
+      {/* Upload Zone: Dedicated Reference / Knowledge Base Documents Section */}
+      <SearchKnowledgeUploadZone 
+        onDocumentAdded={handleDocumentAdded}
+        referenceDocsCount={referenceDocsCount}
+      />
 
       {/* Search Input Box */}
       <div className="bg-white rounded-3xl shadow-xs border border-slate-200 p-6 md:p-8 space-y-6">
@@ -222,7 +267,7 @@ export default function Search() {
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={
                 searchMode === 'FULL_TEXT'
-                  ? "Nhập số hiệu, từ khóa trong tệp, tên dự án, căn cứ pháp lý, Google Drive..."
+                  ? "Nhập số hiệu, từ khóa trong tệp, tên dự án, căn cứ pháp lý, tài liệu tra cứu, Google Drive..."
                   : "Hỏi AI: 'Các văn bản quy định về hạn chót báo cáo quy hoạch tháng 8', 'Nghị quyết về nhân sự'..."
               }
               className="w-full pl-11 pr-32 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
@@ -251,8 +296,8 @@ export default function Search() {
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] text-slate-400 font-bold uppercase">Gợi ý:</span>
               {(searchMode === 'FULL_TEXT' 
-                ? ['Ban Thường vụ', 'UBND', 'Hỏa tốc', 'Sở Tư pháp', 'Google Drive', 'Giải phóng mặt bằng']
-                : ['Văn bản thuộc thẩm quyền Ban Thường vụ', 'Các chỉ đạo về đầu tư công', 'Công văn giao Sở KH&ĐT', 'Văn bản có hạn trong tháng']
+                ? ['Tài liệu tra cứu', 'Ban Thường vụ', 'UBND', 'Căn cứ pháp lý', 'Hỏa tốc', 'Sở Tư pháp', 'Google Drive']
+                : ['Văn bản thuộc thẩm quyền Ban Thường vụ', 'Các tài liệu quy phạm pháp luật đã nạp', 'Chỉ đạo về đầu tư công', 'Văn bản có hạn trong tháng']
               ).map((chip) => (
                 <button
                   type="button"
@@ -275,11 +320,25 @@ export default function Search() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Reference only filter */}
+            <button
+              type="button"
+              onClick={() => setFilterReferenceOnly(!filterReferenceOnly)}
+              className={`px-3 py-1 rounded-lg font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterReferenceOnly
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                  : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+              }`}
+            >
+              <BookOpen className="w-3 h-3" />
+              <span>Kho Tài Liệu Tra Cứu ({referenceDocsCount})</span>
+            </button>
+
             {/* Authority filter */}
             <select
               value={filterAuthority}
               onChange={(e) => setFilterAuthority(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả thẩm quyền</option>
               <option value="STANDING_BOARD">Trình Ban Thường vụ / Thường trực</option>
@@ -290,7 +349,7 @@ export default function Search() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none"
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả loại văn bản</option>
               <option value="NGHI_QUYET">Nghị quyết</option>
@@ -301,15 +360,16 @@ export default function Search() {
 
             {/* Drive filter button */}
             <button
+              type="button"
               onClick={() => setFilterDriveOnly(!filterDriveOnly)}
-              className={`px-3 py-1 rounded-lg font-bold border transition-all flex items-center gap-1 ${
+              className={`px-3 py-1 rounded-lg font-bold border transition-all flex items-center gap-1 cursor-pointer ${
                 filterDriveOnly
                   ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
                   : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
               <HardDrive className="w-3 h-3" />
-              <span>Chỉ hiển thị Google Drive</span>
+              <span>Google Drive</span>
             </button>
           </div>
         </div>
@@ -328,6 +388,69 @@ export default function Search() {
           <div className="text-[10px] text-blue-200/80 pt-2 border-t border-white/10 flex items-center justify-between">
             <span>Tìm thấy {aiAnalysisResult.matchedDocIndexes?.length || 0} văn bản có liên quan trực tiếp</span>
             <span>Đã thẩm định ngữ nghĩa tự động</span>
+          </div>
+        </div>
+      )}
+
+      {/* When user hasn't searched yet: Show Recent Reference Docs Library */}
+      {!hasSearched && recentReferenceDocs.length > 0 && (
+        <div className="bg-white rounded-3xl p-6 shadow-2xs border border-slate-200 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-600" />
+              <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
+                Tài liệu & Căn cứ pháp lý tra cứu đã nạp gần đây ({referenceDocsCount})
+              </h3>
+            </div>
+            <button
+              onClick={() => {
+                setFilterReferenceOnly(true);
+                setResults(poolDocs.filter(d => 
+                  d.isReferenceDoc || 
+                  (d.tags || []).includes('TRA_CUU_THAM_KHAO') || 
+                  (d.tags || []).includes('Văn bản tra cứu') ||
+                  !!d.referenceCategory
+                ));
+                setHasSearched(true);
+              }}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Xem tất cả kho tài liệu</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recentReferenceDocs.map(doc => (
+              <div
+                key={doc.id}
+                onClick={() => navigate(`/documents/${doc.id}`)}
+                className="p-3.5 rounded-2xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer space-y-2 group"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-900 text-[10px] font-black rounded border border-indigo-200">
+                    📚 Tài liệu tra cứu
+                  </span>
+                  {doc.issuedDate && (
+                    <span className="text-[10px] text-slate-400 font-medium">{doc.issuedDate}</span>
+                  )}
+                </div>
+                <h4 className="font-bold text-xs text-slate-800 group-hover:text-indigo-700 line-clamp-2 leading-snug">
+                  {doc.documentNumber ? `[${doc.documentNumber}] ` : ''}{doc.title || doc.fileName}
+                </h4>
+                {doc.summary && (
+                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                    {doc.summary}
+                  </p>
+                )}
+                {doc.uploadedByName && (
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1 pt-1 border-t border-slate-200/60">
+                    <User className="w-2.5 h-2.5" />
+                    <span>Nạp bởi: <strong>{doc.uploadedByName}</strong></span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -375,6 +498,12 @@ export default function Search() {
 
                       <div className="min-w-0 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
+                          {(doc.isReferenceDoc || (doc.tags || []).includes('TRA_CUU_THAM_KHAO')) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-900 border border-indigo-200 text-[10px] font-black rounded-md">
+                              <BookOpen className="w-2.5 h-2.5 text-indigo-700" />
+                              Tài liệu Tra cứu
+                            </span>
+                          )}
                           <span className="text-[11px] font-black text-slate-900">{doc.documentNumber || 'Số: Đang cập nhật'}</span>
                           {doc.proposedAction && (
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-extrabold rounded-md">
@@ -390,6 +519,12 @@ export default function Search() {
                             <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-extrabold rounded-full">
                               <HardDrive className="w-2.5 h-2.5 text-emerald-600" />
                               Google Drive Sync
+                            </span>
+                          )}
+                          {doc.uploadedByName && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-medium rounded">
+                              <User className="w-2 h-2 text-slate-400" />
+                              {doc.uploadedByName}
                             </span>
                           )}
                         </div>

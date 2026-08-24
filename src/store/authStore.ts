@@ -6,6 +6,7 @@ interface AuthState {
   isInitialized: boolean;
   setUser: (user: User | null) => void;
   setInitialized: (val: boolean) => void;
+  logout: () => void;
 }
 
 const getStoredUser = (): User | null => {
@@ -42,9 +43,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       } else {
         sessionStorage.removeItem('trolycvp_user');
         sessionStorage.removeItem('gdrive_access_token');
+        localStorage.removeItem('trolycvp_user');
       }
     }
     set({ user: resolvedUser });
   },
   setInitialized: (val) => set({ isInitialized: val }),
+  logout: () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('trolycvp_user');
+      sessionStorage.removeItem('gdrive_access_token');
+      localStorage.removeItem('trolycvp_user');
+    }
+    set({ user: null });
+  },
 }));

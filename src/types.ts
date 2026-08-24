@@ -129,6 +129,12 @@ export interface Document {
 
   status: 'UPLOADED' | 'ANALYZED' | 'USER_REVIEWED' | 'USER_CONFIRMED' | 'DISPATCHED';
   createdBy?: string;
+  isImportant?: boolean;
+  isStarred?: boolean;
+  isReferenceDoc?: boolean;
+  referenceCategory?: string;
+  uploadedByName?: string;
+  uploadedByEmail?: string;
 }
 
 export interface AssignedOfficer {

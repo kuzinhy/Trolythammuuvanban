@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, FileText, Sparkles, ShieldCheck, Scale, CheckCircle2, Copy, Check, RotateCcw, AlertCircle } from 'lucide-react';
+import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { MessageSquare, X, Send, FileText, Sparkles, ShieldCheck, Scale, CheckCircle2, Copy, Check, RotateCcw, AlertCircle, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { Document } from '../types';
 
 interface AIAssistantProps {
   isOpen?: boolean;
@@ -18,9 +21,30 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
     setInternalIsOpen(val);
   };
 
+  const [referenceDocs, setReferenceDocs] = useState<Document[]>([]);
+
+  useEffect(() => {
+    async function loadReferenceDocs() {
+      try {
+        const snap = await getDocs(query(collection(db, 'documents'), orderBy('createdAt', 'desc'), limit(50)));
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Document));
+        const refDocs = docs.filter(d => 
+          d.isReferenceDoc || 
+          (d.tags || []).includes('TRA_CUU_THAM_KHAO') || 
+          (d.tags || []).includes('Văn bản tra cứu') || 
+          !!d.referenceCategory
+        );
+        setReferenceDocs(refDocs);
+      } catch (e) {
+        console.error('Error fetching reference docs for AIAssistant:', e);
+      }
+    }
+    loadReferenceDocs();
+  }, []);
+
   const initialWelcomeMessage = { 
     role: 'assistant' as const, 
-    content: 'Kính chào đồng chí! Tôi là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy, Chính quyền. Tôi sẵn sàng hỗ trợ phân tích thẩm quyền phân luồng, bóc tách nhiệm vụ chỉ đạo, tra cứu quy định pháp luật và soạn thảo dự thảo văn bản.' 
+    content: 'Kính chào đồng chí! Tôi là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp ủy, Chính quyền (kết nối trực tiếp Kho Tri thức & Căn cứ Pháp lý số hóa). Tôi sẵn sàng hỗ trợ phân tích thẩm quyền phân luồng, bóc tách nhiệm vụ chỉ đạo, tra cứu quy định pháp luật và soạn thảo dự thảo văn bản.' 
   };
 
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant', content: string; isError?: boolean }[]>([
@@ -48,7 +72,6 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
     const trimmed = text.trim();
     if (!trimmed || isThinking) return;
     
-    const contextPrefix = contextDocument ? `[Ngữ cảnh văn bản đang xem: "${contextDocument.title || contextDocument.fileName || contextDocument.documentNumber}" (Số hiệu: ${contextDocument.documentNumber || 'N/A'}, Cơ quan ban hành: ${contextDocument.issuer || 'N/A'})]\n` : '';
     const userMessage = trimmed;
     const newMessages = [...messages, { role: 'user' as const, content: userMessage }];
     setMessages(newMessages);
@@ -58,17 +81,16 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
     try {
       const apiMessages = newMessages
         .filter(m => !m.isError)
-        .map((m, i, arr) => {
-          if (i === arr.length - 1 && contextPrefix && m.role === 'user') {
-            return { role: m.role, content: `${contextPrefix}${m.content}` };
-          }
-          return { role: m.role, content: m.content };
-        });
+        .map((m) => ({ role: m.role, content: m.content }));
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages })
+        body: JSON.stringify({ 
+          messages: apiMessages,
+          contextDocument,
+          referenceDocs: referenceDocs.slice(0, 8),
+        })
       });
       
       const data = await res.json();

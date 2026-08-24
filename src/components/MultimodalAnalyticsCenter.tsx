@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { FileUp, Eye, Sparkles, CheckCircle2, AlertTriangle, FileText, Download, RefreshCw, Cpu, Layers, ArrowRight, ShieldCheck, CheckSquare, Clock } from 'lucide-react';
 
 interface TaskExtracted {
