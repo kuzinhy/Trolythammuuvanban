@@ -788,41 +788,39 @@ export default function Admin() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16 font-sans">
-      {/* Top Banner - Bright Vibrant Luminous Blue */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-blue-500/15 border border-blue-400/30">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/4 -mb-10 w-80 h-80 bg-cyan-300/15 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
+      {/* Top Banner with Google Studio Flowing Gradient Border */}
+      <div className="google-studio-border google-studio-glow">
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 rounded-[calc(1.25rem-2px)] p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-lg shadow-blue-500/10">
+          <div className="space-y-2 relative z-10">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-white/20 text-white font-extrabold text-[10px] uppercase tracking-wider backdrop-blur-md flex items-center gap-1.5 ring-1 ring-white/30">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white font-black text-[10px] uppercase tracking-wider backdrop-blur-xs flex items-center gap-1.5 ring-1 ring-white/30">
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
                 Trung tâm Quản trị Cấp cao
               </span>
-              <span className="px-3 py-1 rounded-full bg-blue-900/40 text-blue-100 text-[10px] font-bold tracking-wide backdrop-blur-md">
+              <span className="px-3 py-1 rounded-full bg-white/15 text-blue-50 text-[10px] font-bold tracking-wide backdrop-blur-xs border border-white/25">
                 Admin: nguyenhuy.thudaumot@gmail.com
               </span>
-              <span className="px-3 py-1 rounded-full bg-emerald-500/30 text-emerald-100 border border-emerald-300/40 text-[10px] font-extrabold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-100 border border-emerald-300/40 text-[10px] font-extrabold flex items-center gap-1 backdrop-blur-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
                 Đã liên thông CSDL ({CONNECTED_APP_ID.substring(0, 8)}...)
               </span>
             </div>
             
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-              Cấu hình & Quản trị Hệ thống Tham mưu
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2 drop-shadow-xs">
+              <Settings className="w-7 h-7 text-sky-200" />
+              <span>Cấu hình & Quản trị Hệ thống Tham mưu</span>
             </h1>
-            <p className="text-xs md:text-sm text-blue-100 max-w-2xl leading-relaxed">
+            <p className="text-xs md:text-sm text-blue-50 max-w-2xl leading-relaxed font-medium">
               Thiết lập liên thông cơ sở dữ liệu & bộ nhớ với ứng dụng <code className="bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">{CONNECTED_APP_ID}</code>, quy chuẩn phân luồng thẩm quyền và thư viện căn cứ pháp lý.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative z-10">
             <button
               onClick={handleSaveAll}
-              className="px-5 py-2.5 bg-white hover:bg-blue-50 text-blue-700 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-black/10 active:scale-95 group"
+              className="px-5 py-2.5 bg-white hover:bg-blue-50 text-blue-900 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-black/15 active:scale-95 group cursor-pointer border border-white/80"
             >
-              <Save className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
+              <Save className="w-4 h-4 text-blue-700 group-hover:scale-110 transition-transform" />
               <span>{saveSuccess ? "Đã lưu cài đặt!" : "Lưu thay đổi"}</span>
             </button>
           </div>
@@ -2682,14 +2680,14 @@ export default function Admin() {
       {/* TAB: REPORTS */}
       {activeTab === 'reports' && (() => {
         const totalDocs = reportsDocuments.length;
-        const urgentDocs = reportsDocuments.filter(d => d.urgency === 'KHANG_CAP' || d.urgency === 'HO_TOC').length;
-        const processedDocs = reportsDocuments.filter(d => d.status === 'COMPLETED' || d.status === 'DA_XU_LY').length;
+        const urgentDocs = reportsDocuments.filter(d => d.urgency === 'KHANG_CAP' || d.urgency === 'HO_TOC' || d.urgency === 'Hỏa tốc' || d.urgency === 'Thượng khẩn').length;
+        const processedDocs = reportsDocuments.filter(d => d.status === 'DISPATCHED' || d.status === 'USER_CONFIRMED' || (d.status as string) === 'COMPLETED' || (d.status as string) === 'DA_XU_LY').length;
         
         const totalTasks = reportsTasks.length;
-        const completedTasks = reportsTasks.filter(t => t.status === 'completed').length;
-        const inProgressTasks = reportsTasks.filter(t => t.status === 'in_progress' || t.status === 'pending').length;
+        const completedTasks = reportsTasks.filter(t => t.status === 'COMPLETED' || (t.status as string) === 'completed').length;
+        const inProgressTasks = reportsTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'PENDING' || (t.status as string) === 'in_progress' || (t.status as string) === 'pending').length;
         const overdueTasks = reportsTasks.filter(t => {
-          if (!t.dueDate || t.status === 'completed') return false;
+          if (!t.dueDate || t.status === 'COMPLETED' || (t.status as string) === 'completed') return false;
           return new Date(t.dueDate) < new Date();
         }).length;
 
@@ -2867,8 +2865,8 @@ export default function Admin() {
 
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                         {officers.map(officer => {
-                          const assignedCount = reportsTasks.filter(t => t.assigneeId === officer.id || t.assignedTo === officer.fullName).length;
-                          const completedCount = reportsTasks.filter(t => (t.assigneeId === officer.id || t.assignedTo === officer.fullName) && t.status === 'completed').length;
+                          const assignedCount = reportsTasks.filter(t => t.assigneeId === officer.id || t.assignedTo === officer.fullName || t.suggestedResponsiblePerson === officer.fullName).length;
+                          const completedCount = reportsTasks.filter(t => (t.assigneeId === officer.id || t.assignedTo === officer.fullName || t.suggestedResponsiblePerson === officer.fullName) && (t.status === 'COMPLETED' || (t.status as string) === 'completed')).length;
                           return (
                             <div key={officer.id} className="bg-white p-3.5 rounded-xl border border-slate-200/80 flex items-center justify-between shadow-2xs">
                               <div>

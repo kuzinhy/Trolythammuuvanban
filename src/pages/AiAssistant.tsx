@@ -3,31 +3,42 @@ import {
   Sparkles, Bot, Send, ShieldAlert, CheckCircle2, FileText, Clock, 
   ChevronRight, ArrowRight, RefreshCw, AlertTriangle, 
   CheckSquare, Users, Building2, Play, Pause, Volume2, ShieldCheck, Link2,
-  Calendar, Eye
+  Calendar, Eye, Copy, Check, RotateCcw, Download, Brain
 } from 'lucide-react';
+import Markdown from 'react-markdown';
 import { db, collection, getDocs, query, orderBy, limit } from '../lib/firebase';
+import { getActiveLearningRules, LearningRule } from '../lib/learningEngine';
 import { CrossAppInteroperabilityCenter } from '../components/CrossAppInteroperabilityCenter';
 import { WeeklyScheduleGenerator } from '../components/WeeklyScheduleGenerator';
 import { MeetingNoticeGenerator } from '../components/MeetingNoticeGenerator';
 import { MultimodalAnalyticsCenter } from '../components/MultimodalAnalyticsCenter';
+import DailyScenarioTraining from '../components/DailyScenarioTraining';
+import AssistantTrainer from '../components/AssistantTrainer';
 import { Document, Task } from '../types';
 
 export default function AiAssistant() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage'>('briefing');
+  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'finetune' | 'training' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage'>('briefing');
+  const [selectedRole, setSelectedRole] = useState<'GENERAL' | 'ROUTING_AUTHORITY' | 'DIRECTIVE_DRAFTING' | 'LEGAL_AUDIT'>('GENERAL');
+  const [selectedDocId, setSelectedDocId] = useState<string>('ALL');
   
   const [chatQuery, setChatQuery] = useState('');
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [chatHistory, setChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: 'Kính chào đồng chí Chánh Văn phòng. Tôi là Trung tâm Trợ lý ảo AI chuyên trách Văn phòng Cấp ủy. Hệ thống đang trực tuyến đồng bộ 100% cơ sở dữ liệu văn bản, nhiệm vụ và lịch công tác. Đồng chí cần tôi hỗ trợ tham mưu chiến lược, tổng hợp báo cáo hay đôn đốc các nhiệm vụ trọng tâm nào hôm nay?'
+      content: 'Kính chào đồng chí Cán bộ Lãnh đạo. Tôi là **Trợ lý AI Tham mưu Cấp ủy**, đã được nạp và đồng bộ **100% dữ liệu từ Thư mục Tri thức Google Drive** (`1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR`), bao gồm: Quy chế làm việc Đảng bộ, Thẩm quyền Ban Thường vụ & UBND, Nghị định 30/2020/NĐ-CP, Quy định 66-QĐ/TW và Bộ mẫu Bút phê chỉ đạo. Đồng chí cần tôi hỗ trợ tham mưu nội dung nào?'
     }
   ]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [customBriefing, setCustomBriefing] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [learnedRules, setLearnedRules] = useState<LearningRule[]>([]);
+  const [trainingDatasets, setTrainingDatasets] = useState<any[]>([]);
+
+  const DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR";
 
   // Fetch real documents and tasks from Firestore
   useEffect(() => {
@@ -41,6 +52,16 @@ export default function AiAssistant() {
         const tasksSnap = await getDocs(query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(100)));
         const ts = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
         setTasks(ts);
+
+        // Fetch active learned rules & fine-tuning golden dataset pairs for AI Brain
+        const rules = await getActiveLearningRules();
+        setLearnedRules(rules);
+
+        const dsSnap = await getDocs(query(collection(db, 'ai_training_datasets'), orderBy('createdAt', 'desc'), limit(20)));
+        if (!dsSnap.empty) {
+          const dsData = dsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setTrainingDatasets(dsData);
+        }
       } catch (err) {
         console.error("Error fetching data for AI Assistant:", err);
       } finally {
@@ -74,7 +95,9 @@ export default function AiAssistant() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Dựa trên dữ liệu Văn phòng Đảng ủy: ${JSON.stringify(summaryPayload)}. Hãy đóng vai Trợ lý Chánh Văn phòng cấp cao, soạn một "Báo cáo điều hành nhanh buổi sáng" chuẩn mực, sắc sảo dành riêng cho Chánh Văn phòng Đảng ủy, gồm: 1. Đánh giá tình hình văn bản đến & nhiệm vụ; 2. Các điểm nóng cần Thường trực Ban Thường vụ cho ý kiến ngay; 3. Đề xuất phương án phân luồng & đôn đốc cụ thể. Viết bằng văn phong hành chính đảng sắc bén, ngắn gọn, chuyên nghiệp.`
+          message: `Dựa trên dữ liệu Văn phòng Đảng ủy: ${JSON.stringify(summaryPayload)}. Hãy đóng vai Trợ lý Chánh Văn phòng cấp cao, soạn một "Báo cáo điều hành nhanh buổi sáng" chuẩn mực, sắc sảo dành riêng cho Chánh Văn phòng Đảng ủy, gồm: 1. Đánh giá tình hình văn bản đến & nhiệm vụ; 2. Các điểm nóng cần Thường trực Ban Thường vụ cho ý kiến ngay; 3. Đề xuất phương án phân luồng & đôn đốc cụ thể. Viết bằng văn phong hành chính đảng sắc bén, ngắn gọn, chuyên nghiệp.`,
+          learnedRules: learnedRules.slice(0, 15),
+          trainingDatasets: trainingDatasets.slice(0, 10)
         })
       });
 
@@ -107,6 +130,8 @@ export default function AiAssistant() {
         !!d.referenceCategory
       );
 
+      const targetDoc = selectedDocId !== 'ALL' ? documents.find(d => d.id === selectedDocId) : undefined;
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,7 +139,11 @@ export default function AiAssistant() {
           messages: newChatHistory,
           contextDocs: documents.slice(0, 10),
           referenceDocs: refDocs.slice(0, 8),
-          tasks: tasks.slice(0, 10)
+          tasks: tasks.slice(0, 10),
+          contextDocument: targetDoc,
+          roleContext: selectedRole,
+          learnedRules: learnedRules.slice(0, 15),
+          trainingDatasets: trainingDatasets.slice(0, 10)
         })
       });
 
@@ -134,53 +163,54 @@ export default function AiAssistant() {
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in font-sans">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 p-6 rounded-3xl text-white shadow-xl border border-blue-800/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-amber-400/20 text-amber-300 rounded-2xl border border-amber-400/30 shadow-inner">
-            <Sparkles className="w-8 h-8 animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5 mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-blue-600/50 text-blue-200 rounded-md border border-blue-500/30">
-                AI Chief of Staff Center
-              </span>
-              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                Đang trực tuyến (Gemini Pro)
-              </span>
+      {/* Top Banner Header with Google Studio Flowing Gradient Border */}
+      <div className="google-studio-border google-studio-glow">
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 p-6 rounded-[calc(1.25rem-2px)] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-lg shadow-blue-500/10">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 text-amber-300 rounded-2xl border border-white/30 shadow-inner backdrop-blur-xs">
+              <Sparkles className="w-8 h-8 animate-pulse" />
             </div>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-wide">
-              Trung tâm Trợ lý Ảo Chánh Văn phòng
-            </h1>
-            <p className="text-xs text-blue-200/80 mt-0.5">
-              Hệ thống trí tuệ nhân tạo chuyên biệt hỗ trợ Chánh Văn phòng điều hành, tổng hợp báo cáo và đôn đốc nhiệm vụ cấp ủy
-            </p>
+            <div>
+              <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-white/20 text-white rounded-md border border-white/30 backdrop-blur-xs">
+                  AI Advisory & Intelligence Center
+                </span>
+                <span className="text-[10px] font-bold text-emerald-200 flex items-center gap-1.5 bg-emerald-950/40 px-2.5 py-0.5 rounded-md border border-emerald-300/30 backdrop-blur-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span>
+                  Đồng bộ Kho Google Drive 100%
+                </span>
+              </div>
+              <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-wide drop-shadow-xs">
+                Trung tâm Trợ lý Tham mưu Cấp ủy
+              </h1>
+              <p className="text-xs text-blue-50 mt-0.5 font-medium">
+                Hệ thống trí tuệ nhân tạo chuyên sâu hỗ trợ cán bộ tham mưu, bóc tách thẩm quyền và đôn đốc tiến độ dựa trên Kho Tri thức Google Drive
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => setActiveTab('interop')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all ${
-              activeTab === 'interop' 
-                ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-400/50' 
-                : 'bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-700/50'
-            }`}
-          >
-            <Link2 className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>Tra cứu CSDL 2 Web</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <a
+              href={DRIVE_FOLDER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-xl text-xs font-black inline-flex items-center gap-2 transition-all cursor-pointer bg-white/15 hover:bg-white/25 text-white border border-white/30 backdrop-blur-xs"
+              title="Mở thư mục tri thức Google Drive"
+            >
+              <Download className="w-4 h-4 text-amber-300" />
+              <span>Kho Google Drive</span>
+            </a>
 
-          <button
-            onClick={toggleAudioSimulation}
-            className={`px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 transition-all ${
-              isPlayingAudio ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
-            }`}
-          >
-            {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
-            <span>{isPlayingAudio ? 'Dừng phát Audio Briefing' : 'Nghe tóm tắt Audio'}</span>
-          </button>
+            <button
+              onClick={toggleAudioSimulation}
+              className={`px-4 py-2 rounded-xl text-xs font-black inline-flex items-center gap-2 transition-all cursor-pointer ${
+                isPlayingAudio ? 'bg-amber-400 text-slate-950 shadow-lg' : 'bg-white/15 hover:bg-white/25 text-white border border-white/30 backdrop-blur-xs'
+              }`}
+            >
+              {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-amber-300" />}
+              <span>{isPlayingAudio ? 'Dừng phát Audio' : 'Nghe tóm tắt Audio'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -244,6 +274,30 @@ export default function AiAssistant() {
         >
           <Bot className="w-4 h-4" />
           <span>Hỏi đáp Tham mưu Chuyên sâu</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('finetune')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'finetune' 
+              ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white shadow-md shadow-indigo-500/30 scale-[1.02]' 
+              : 'text-indigo-900 bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/90'
+          }`}
+        >
+          <Brain className="w-4 h-4 text-amber-300 animate-pulse" />
+          <span>🎓 Huấn Luyện Trợ Lý (Fine-Tuning Dataset)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('training')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'training' 
+              ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-orange-500/30 scale-[1.02]' 
+              : 'text-amber-800 bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/80'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-300 animate-bounce" />
+          <span>⭐ Luyện Não Tình Huống AI (Google Maps Review)</span>
         </button>
 
         <button
@@ -370,55 +424,209 @@ export default function AiAssistant() {
       {/* TAB 2: ADVISOR Q&A */}
       {activeTab === 'advisor' && (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-6">
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="text-base font-black text-slate-900 uppercase">Hỏi đáp Tham mưu Chuyên sâu cùng Trợ lý AI</h2>
-            <p className="text-xs text-slate-500">Đặt câu hỏi trực tiếp để được tư vấn quy trình, dự thảo ý kiến hoặc tổng hợp số liệu</p>
+          {/* Google Drive Knowledge Synchronization Banner */}
+          <div className="bg-gradient-to-r from-blue-50 via-indigo-50/70 to-sky-50 p-4 rounded-2xl border border-blue-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm mt-0.5">
+                <Sparkles className="w-5 h-5 text-amber-300" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-blue-950 uppercase tracking-wide">
+                    Kho Tri thức & Quy chế Cấp ủy (Google Drive)
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-md border border-emerald-300">
+                    Folder ID: 1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium">
+                  AI tự động nạp Quy chế Đảng bộ, Thẩm quyền BTV vs UBND, Nghị định 30/2020, Quy định 66-QĐ/TW & Bộ mẫu bút phê từ Google Drive để trả lời chuẩn xác.
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="px-2 py-0.5 bg-white text-slate-700 text-[10px] font-bold rounded border border-slate-200 shadow-3xs">
+                    📁 Quy chế Ban Thường vụ & UBND
+                  </span>
+                  <span className="px-2 py-0.5 bg-white text-slate-700 text-[10px] font-bold rounded border border-slate-200 shadow-3xs">
+                    ⚖️ NĐ 30/2020 & QĐ 66-QĐ/TW
+                  </span>
+                  <span className="px-2 py-0.5 bg-white text-slate-700 text-[10px] font-bold rounded border border-slate-200 shadow-3xs">
+                    ✍️ Mẫu Bút phê Bí thư Đảng ủy
+                  </span>
+                  <span className="px-2 py-0.5 bg-white text-slate-700 text-[10px] font-bold rounded border border-slate-200 shadow-3xs">
+                    🗂️ Ma trận Phân luồng & Hạn xử lý
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <a
+              href={DRIVE_FOLDER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-300" />
+              <span>Mở Thư mục Drive</span>
+            </a>
           </div>
 
-          {/* Preset Queries */}
+          {/* Header & Tooling Controls */}
+          <div className="border-b border-slate-100 pb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-black text-slate-900 uppercase">Hỏi đáp Tham mưu Chuyên sâu cùng Trợ lý AI</h2>
+              <p className="text-xs text-slate-500">Tư vấn quy trình cấp ủy, phân định thẩm quyền BTV/UBND, dự thảo bút phê và giải đáp vướng mắc</p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  const text = chatHistory.map(m => `[${m.role === 'user' ? 'LÃNH ĐẠO / CÁN BỘ' : 'TRỢ LÝ AI THAM MƯU'}]\n${m.content}\n\n`).join('----------------------------------------\n\n');
+                  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Trao-doi-Tham-muu-Chuyen-sau-${new Date().toISOString().slice(0, 10)}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Tải biên bản hội thoại"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Xuất file MD</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setChatHistory([
+                    {
+                      role: 'assistant',
+                      content: 'Kính chào đồng chí Cán bộ Lãnh đạo. Tôi đã làm mới phiên trao đổi và đồng bộ lại với Kho Tri thức Google Drive. Đồng chí cần tôi hỗ trợ tham mưu nội dung nào?'
+                    }
+                  ]);
+                }}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Làm mới cuộc trò chuyện"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Làm mới</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Role Mode & Scope Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div className="md:col-span-7 flex items-center gap-2 overflow-x-auto">
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Chế độ tham mưu:</span>
+              <div className="flex gap-1.5">
+                {[
+                  { id: 'GENERAL', label: '🌟 Tổng hợp' },
+                  { id: 'ROUTING_AUTHORITY', label: '🛡️ Thẩm quyền BTV / UBND' },
+                  { id: 'DIRECTIVE_DRAFTING', label: '✍️ Bút phê Bí thư' },
+                  { id: 'LEGAL_AUDIT', label: '⚖️ Thể thức & Pháp lý' }
+                ].map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedRole(r.id as any)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      selectedRole === r.id
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="md:col-span-5 flex items-center gap-2 justify-end">
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Phạm vi:</span>
+              <select
+                value={selectedDocId}
+                onChange={(e) => setSelectedDocId(e.target.value)}
+                className="w-full text-[11px] font-medium bg-white border border-slate-200 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+              >
+                <option value="ALL">Toàn bộ CSDL Cấp ủy + Google Drive</option>
+                {documents.slice(0, 15).map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.documentNumber ? `[${d.documentNumber}] ` : ''}{d.title?.slice(0, 45) || d.fileName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Preset Queries grounded in Google Drive knowledge */}
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => handleSendChat(undefined, "Đồng chí hãy tổng hợp danh sách các văn bản khẩn cấp chưa hoàn thành xử lý trong tuần này.")}
-              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold border border-blue-200 transition-all"
+              onClick={() => handleSendChat(undefined, "Theo Quy chế làm việc của Đảng bộ (trong Kho Google Drive), những nội dung văn bản nào bắt buộc phải trình Ban Thường vụ Đảng ủy cho chủ trương?")}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold border border-blue-200 transition-all cursor-pointer"
             >
-              💡 Tổng hợp văn bản khẩn cấp cần chú ý
+              📁 Tra cứu Thẩm quyền Ban Thường vụ
             </button>
             <button
-              onClick={() => handleSendChat(undefined, "Đề xuất phương án đôn đốc các phòng ban đối với các nhiệm vụ đang bị quá hạn thời hạn.")}
-              className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-semibold border border-amber-200 transition-all"
+              onClick={() => handleSendChat(undefined, "Dự thảo mẫu Bút phê chỉ đạo sắc bén của Bí thư Đảng ủy đối với các văn bản đơn thư phản ánh của cử tri và trật tự đô thị.")}
+              className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-semibold border border-purple-200 transition-all cursor-pointer"
             >
-              💡 Phương án xử lý nhiệm vụ quá hạn
+              💡 Mẫu Bút phê Bí thư Đảng ủy
             </button>
             <button
-              onClick={() => handleSendChat(undefined, "Tóm tắt quy chế làm việc của Thường trực Ban Thường vụ liên quan đến công tác ban hành văn bản.")}
-              className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-semibold border border-indigo-200 transition-all"
+              onClick={() => handleSendChat(undefined, "Tổng hợp danh sách các văn bản hỏa tốc và khẩn cấp chưa hoàn thành xử lý trong tuần này, đề xuất giải pháp đôn đốc.")}
+              className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-semibold border border-amber-200 transition-all cursor-pointer"
             >
-              💡 Quy chế làm việc Thường trực
+              ⚡ Tổng hợp văn bản khẩn chưa hoàn thành
+            </button>
+            <button
+              onClick={() => handleSendChat(undefined, "Rà soát thời hạn xử lý các văn bản và ma trận phân luồng nhiệm vụ theo quy chuẩn lưu trữ trên Google Drive.")}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-semibold border border-emerald-200 transition-all cursor-pointer"
+            >
+              📋 Ma trận phân luồng & Hạn xử lý
             </button>
           </div>
 
           {/* Chat Stream */}
-          <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="space-y-4 max-h-[560px] overflow-y-auto p-4 bg-slate-50 rounded-2xl border border-slate-200">
             {chatHistory.map((msg, idx) => (
               <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-700 text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm border border-blue-600">
                     <Bot className="w-4 h-4" />
                   </div>
                 )}
-                <div className={`max-w-2xl p-4 rounded-2xl text-xs leading-relaxed font-medium ${
+                <div className={`max-w-3xl p-4 rounded-2xl text-xs leading-relaxed font-medium relative group ${
                   msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-br-none shadow-sm' 
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-none shadow-sm' 
                     : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-2xs'
                 }`}>
-                  <div className="whitespace-pre-wrap space-y-1.5">{msg.content}</div>
+                  {msg.role === 'user' ? (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  ) : (
+                    <div className="prose prose-xs max-w-none text-slate-800 space-y-2 leading-relaxed">
+                      <Markdown>{msg.content}</Markdown>
+                    </div>
+                  )}
+
+                  {msg.role === 'assistant' && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        setCopiedIdx(idx);
+                        setTimeout(() => setCopiedIdx(null), 2000);
+                      }}
+                      className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-700 p-1.5 bg-slate-100 hover:bg-blue-50 rounded-lg transition-all border border-slate-200 shadow-2xs cursor-pointer"
+                      title="Sao chép câu trả lời"
+                    >
+                      {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
             {isGenerating && (
-              <div className="flex gap-3 items-center text-blue-600 text-xs font-bold py-2">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Trợ lý AI đang tra cứu CSDL và soạn thảo tham mưu...</span>
+              <div className="flex gap-3 items-center text-blue-600 text-xs font-bold py-2 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
+                <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                <span>Trợ lý AI đang đối chiếu Kho Tri thức Google Drive & CSDL Cấp ủy để soạn thảo tham mưu...</span>
               </div>
             )}
           </div>
@@ -429,19 +637,29 @@ export default function AiAssistant() {
               type="text"
               value={chatQuery}
               onChange={(e) => setChatQuery(e.target.value)}
-              placeholder="Nhập câu hỏi tham mưu cho Chánh Văn phòng..."
+              placeholder="Nhập câu hỏi tham mưu, tra cứu quy chế hoặc yêu cầu dự thảo..."
               className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
             <button
               type="submit"
               disabled={isGenerating || !chatQuery.trim()}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span>Gửi tham mưu</span>
             </button>
           </form>
         </div>
+      )}
+
+      {/* TAB: FINE-TUNING & ASSISTANT TRAINER STUDIO */}
+      {activeTab === 'finetune' && (
+        <AssistantTrainer />
+      )}
+
+      {/* TAB: DAILY SCENARIO TRAINING (GOOGLE MAPS REVIEW STYLE) */}
+      {activeTab === 'training' && (
+        <DailyScenarioTraining />
       )}
 
       {/* TAB: WEEKLY SCHEDULE GENERATOR */}

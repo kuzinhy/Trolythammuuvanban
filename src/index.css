@@ -133,3 +133,121 @@
   background: #94a3b8;
 }
 
+/* =========================================================================
+   Google AI Studio Signature Glowing Flowing Gradient Border (Loan Màu)
+   ========================================================================= */
+
+@keyframes googleStudioFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes googleStudioSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 1. Google Studio Flowing Gradient Border Wrapper */
+.google-studio-border {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 2px;
+  background: linear-gradient(
+    90deg, 
+    #3b82f6 0%, 
+    #8b5cf6 25%, 
+    #ec4899 50%, 
+    #06b6d4 75%, 
+    #3b82f6 100%
+  );
+  background-size: 300% 300%;
+  animation: googleStudioFlow 6s ease infinite;
+  box-shadow: 0 8px 32px -6px rgba(99, 102, 241, 0.2), 0 0 15px -3px rgba(6, 182, 212, 0.15);
+}
+
+.google-studio-border-inner {
+  background: inherit;
+  border-radius: calc(1.25rem - 2px);
+  width: 100%;
+  height: 100%;
+}
+
+/* 2. Google Studio Ambient Glow Underlay */
+.google-studio-glow {
+  position: relative;
+}
+
+.google-studio-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg, 
+    #3b82f6, 
+    #8b5cf6, 
+    #d946ef, 
+    #06b6d4, 
+    #3b82f6
+  );
+  background-size: 300% 300%;
+  animation: googleStudioFlow 6s ease infinite;
+  filter: blur(10px);
+  opacity: 0.45;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.google-studio-glow:hover::before {
+  opacity: 0.75;
+  filter: blur(14px);
+}
+
+/* 3. Direct Google Studio Border for Dark & Light Header Cards */
+.google-studio-card {
+  position: relative;
+  border-radius: 1.25rem;
+  border: 1.5px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 10px 30px -8px rgba(37, 99, 235, 0.18), 0 0 20px -4px rgba(139, 92, 246, 0.15);
+}
+
+.google-studio-card-dark {
+  background-image: 
+    linear-gradient(135deg, #1d4ed8, #4338ca, #0284c7),
+    linear-gradient(115deg, #3b82f6 0%, #8b5cf6 30%, #ec4899 55%, #06b6d4 85%, #3b82f6 100%);
+  background-size: 100% 100%, 250% 250%;
+  animation: googleStudioFlow 8s ease infinite;
+}
+
+.google-studio-card-light {
+  background-image: 
+    linear-gradient(#ffffff, #ffffff),
+    linear-gradient(115deg, #3b82f6 0%, #8b5cf6 30%, #ec4899 55%, #06b6d4 85%, #3b82f6 100%);
+  background-size: 100% 100%, 250% 250%;
+  animation: googleStudioFlow 8s ease infinite;
+}
+
+/* 4. Google Studio Shimmering Pill / Badge */
+.google-studio-pill {
+  position: relative;
+  border-radius: 9999px;
+  padding: 1px;
+  background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899, #06b6d4);
+  background-size: 250% 250%;
+  animation: googleStudioFlow 4s ease infinite;
+}
+

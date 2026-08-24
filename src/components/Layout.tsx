@@ -15,7 +15,7 @@ import {
 import AIAssistant from "./AIAssistant";
 import { cn } from "../lib/utils";
 
-const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY";
+const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR";
 
 export default function Layout() {
   const { user, setUser, logout: authStoreLogout } = useAuthStore();
@@ -90,6 +90,7 @@ export default function Layout() {
       case '/': return 'Bàn làm việc & Tham mưu Văn bản';
       case '/documents': return 'Sổ Đăng ký & Quản lý Văn bản';
       case '/tasks': return 'Theo dõi & Đôn đốc Nhiệm vụ';
+      case '/ai-assistant': return 'Trợ lý Tham mưu';
       case '/search': return 'Tra cứu & Thống kê Văn bản';
       case '/map': return 'Bản đồ số Địa bàn & Điểm nóng Giám sát';
       case '/directive': return 'Trợ lý Soạn thảo Ý kiến Kết luận Chỉ đạo';
@@ -191,7 +192,7 @@ export default function Layout() {
               )}
             >
               <Bot className="w-4 h-4 text-amber-500 flex-shrink-0 group-hover:scale-110 transition-transform" />
-              <span className="truncate">Trợ lý ảo Chánh VP</span>
+              <span className="truncate">Trợ lý tham mưu</span>
             </NavLink>
 
             <NavLink
@@ -459,17 +460,6 @@ export default function Layout() {
               )}
             </div>
 
-            {/* Gemini AI Assistant Button with GenZ Gradient & Glow */}
-            <button
-              onClick={() => setIsAIOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.03] active:scale-[0.97] shadow-md shadow-indigo-500/20 group cursor-pointer border border-blue-400/30"
-              title="Mở Trợ lý AI Tham mưu Gemini"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin-slow group-hover:rotate-12 transition-transform" />
-              <span>Trợ lý AI</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-300/40"></span>
-            </button>
-
             {/* Direct Google Drive Folder Button */}
             <a
               href={TARGET_DRIVE_FOLDER_URL}
@@ -482,17 +472,6 @@ export default function Layout() {
               <span>Google Drive</span>
               <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </a>
-
-            {/* Logout Button */}
-            <button 
-              onClick={handleLogout} 
-              disabled={isLoggingOut}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-transparent hover:border-red-100 disabled:opacity-50"
-              title="Đăng xuất"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Đăng xuất</span>
-            </button>
           </div>
         </header>
 

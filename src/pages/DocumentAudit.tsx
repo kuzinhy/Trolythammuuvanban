@@ -195,25 +195,28 @@ export default function DocumentAudit() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 font-sans pb-12 px-4 md:px-6">
       
-      {/* Top Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-indigo-900/60 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2 relative z-10">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-              <FileSearch className="w-3.5 h-3.5" />
-              Chuyên gia Thể thức & Chính tả
-            </span>
-            <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[10px] font-bold uppercase tracking-wider">
-              Nghị định 30/2020/NĐ-CP & Quy chế Đảng
-            </span>
+      {/* Top Banner with Google Studio Flowing Gradient Border */}
+      <div className="google-studio-border google-studio-glow">
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 rounded-[calc(1.25rem-2px)] p-6 md:p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-lg shadow-blue-500/10">
+          <div className="space-y-2 relative z-10">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-amber-400/25 text-amber-200 border border-amber-300/40 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 backdrop-blur-xs">
+                <FileSearch className="w-3.5 h-3.5" />
+                Chuyên gia Thể thức & Chính tả
+              </span>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white border border-white/30 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 backdrop-blur-xs">
+                <Sparkles className="w-3 h-3 text-cyan-200" />
+                Google Studio Linter AI
+              </span>
+            </div>
+            <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2.5 drop-shadow-xs">
+              <ShieldCheck className="w-6 h-6 text-emerald-300" />
+              <span>Rà Soát & Hoàn Thiện Văn Bản Hành Chính</span>
+            </h1>
+            <p className="text-xs md:text-sm text-blue-50 max-w-2xl leading-relaxed font-medium">
+              Tự động phát hiện lỗi chính tả, lỗi thể thức, lọc từ ngữ chưa phù hợp ngữ cảnh cơ quan Đảng & Nhà nước, đồng thời đề xuất viết lại câu sắc sảo và chuẩn mực.
+            </p>
           </div>
-          <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-            <ShieldCheck className="w-6 h-6 text-emerald-400" />
-            <span>Rà Soát & Hoàn Thiện Văn Bản Hành Chính</span>
-          </h1>
-          <p className="text-xs md:text-sm text-slate-200 max-w-2xl leading-relaxed font-medium">
-            Tự động phát hiện lỗi chính tả, lỗi thể thức, lọc từ ngữ chưa phù hợp ngữ cảnh cơ quan Đảng & Nhà nước, đồng thời đề xuất viết lại câu sắc sảo và chuẩn mực.
-          </p>
         </div>
       </div>
 

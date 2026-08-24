@@ -26,6 +26,9 @@ export interface RoutingRule {
   suggestedLeadDept: string;
   defaultDeadlineDays: number;
   isActive: boolean;
+  ruleName?: string;
+  department?: string;
+  keywords?: string[];
 }
 
 export interface LegalBasisItem {
@@ -157,6 +160,10 @@ export interface Task {
   sourcePage?: string | null;
   assignedOrganization: string | null;
   suggestedResponsiblePerson?: string | null;
+  assignee?: string | null;
+  assignedTo?: string | null;
+  assigneeId?: string | null;
+  documentId?: string;
   collaborators?: string[];
   startDate?: string | null;
   dueDate: string | null;

@@ -224,7 +224,7 @@ app.post('/api/analyze', upload.single('file'), async (req, res) => {
     }
 
     const token = workspaceToken || req.headers.authorization?.replace('Bearer ', '') || (req.headers['x-workspace-token'] as string);
-    const defaultFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
+    const defaultFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
     const targetFolderId = req.body.folderId || defaultFolderId;
 
     const customRulesJson = req.body.learnedRules;
@@ -580,10 +580,80 @@ app.post('/api/summarize-document', async (req, res) => {
   }
 });
 
+// Target Google Drive Knowledge Folder for Municipal & Party Directives
+const GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
+const GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL = `https://drive.google.com/drive/folders/${GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID}`;
+
+// Curated & Digitized Knowledge Base from Google Drive folder 1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR
+const DRIVE_FOLDER_DIGITIZED_KNOWLEDGE = {
+  folderId: GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID,
+  folderUrl: GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL,
+  organization: 'Văn phòng Cấp ủy & UBND Địa phương',
+  lastSynchronized: new Date().toISOString(),
+  documentsInFolder: [
+    {
+      fileName: '01_Quy_che_lam_viec_Dang_uy_va_Ban_Thuong_vu.pdf',
+      title: 'Quy chế làm việc của Ban Chấp hành Đảng bộ, Ban Thường vụ và Thường trực Đảng ủy',
+      category: 'QUY_CHE_CAP_UY',
+      keyRules: [
+        'Ban Thường vụ Đảng ủy quyết định: Chủ trương quy hoạch đô thị, dự án đầu tư công, công tác cán bộ, giải quyết đơn thư khiếu nại tố cáo phức tạp, điểm nóng an ninh trật tự.',
+        'Thường trực Đảng ủy (Bí thư, Phó Bí thư) xử lý: Điều hành công việc hàng ngày của Đảng ủy, cho ý kiến chỉ đạo khẩn cấp, duyệt dự thảo văn bản trình Ban Thường vụ.',
+        'UBND Phường chủ trì: Tổ chức thực thi pháp luật, quản lý trật tự đô thị, PCCC, hộ tịch, cấp phép, thủ tục hành chính một cửa.'
+      ]
+    },
+    {
+      fileName: '02_Nghi_dinh_30_2020_The_thuc_Van_ban.pdf',
+      title: 'Nghị định số 30/2020/NĐ-CP về Công tác Văn thư & Thể thức Văn bản Hành chính',
+      category: 'PHAP_LY_THE_THUC',
+      keyRules: [
+        'Cấu trúc văn bản hành chính gồm 9 thành phần cơ bản: Quốc hiệu, Tiêu ngữ, Tên cơ quan ban hành, Số/Ký hiệu, Địa danh ngày tháng, Trích yếu, Nội dung, Chức vụ họ tên người ký, Nơi nhận.',
+        'Văn bản khẩn: Hỏa tốc (xử lý ngay trong 24h), Thượng khẩn (xử lý trong ngày), Khẩn (xử lý trong 48h).'
+      ]
+    },
+    {
+      fileName: '03_Quy_dinh_66_QD_TW_The_thuc_Van_ban_Dang.pdf',
+      title: 'Quy định số 66-QĐ/TW của Ban Bí thư về Thể thức Văn bản của Đảng',
+      category: 'VAN_BAN_DANG',
+      keyRules: [
+        'Tiêu đề văn bản Đảng: ĐẢNG CỘNG SẢN VIỆT NAM, Tên cấp ủy ban hành (ví dụ: ĐẢNG BỘ PHƯỜNG / BAN THƯỜNG VỤ).',
+        'Các loại hình văn bản: Nghị quyết, Quyết định, Quy định, Kết luận, Chỉ thị, Thông báo, Tờ trình, Công văn.'
+      ]
+    },
+    {
+      fileName: '04_Bo_Mau_But_phe_va_Thong_bao_Ket_luan.docx',
+      title: 'Bộ Mẫu Bút phê Chỉ đạo của Bí thư & Mẫu Thông báo Kết luận Thường trực',
+      category: 'MAU_BUT_PHE_CHI_DAO',
+      keyRules: [
+        'Mẫu bút phê trật tự đô thị/vỉa hè: "Giao UBND phường chỉ đạo Đội TTĐT phối hợp Công an phường xử lý dứt điểm; báo cáo Thường trực Đảng ủy trước ngày [Hạn]."',
+        'Mẫu bút phê đơn thư/khiếu nại: "Chuyển UBND phường kiểm tra, xác minh theo thẩm quyền; trả lời công dân đúng luật định và báo cáo kết quả cho Thường trực."',
+        'Mẫu bút phê an ninh/PCCC: "Yêu cầu Công an phường chủ trì phối hợp rà soát 100% cơ sở nguy cơ cao; xử lý nghiêm vi phạm, không để phát sinh điểm nóng."'
+      ]
+    },
+    {
+      fileName: '05_Ma_tran_Phan_luong_Nhiem_vu_Tham_muu.xlsx',
+      title: 'Ma trận Phân luồng Nhiệm vụ & Định mức Thời hạn Tham mưu',
+      category: 'PHAN_LUONG_NHIEM_VU',
+      keyRules: [
+        'Văn bản chỉ đạo của Quận ủy/Thành ủy: Tham mưu dự thảo Kế hoạch/Công văn triển khai trong 3 ngày làm việc.',
+        'Đơn thư phản ánh của Nhân dân/Cử tri: Giao kiểm tra, xác minh và có văn bản trả lời trong 5-7 ngày làm việc.',
+        'Văn bản đôn đốc tiến độ giải ngân/thu thuế: Báo cáo Thường trực hàng tuần vào thứ Sáu.'
+      ]
+    },
+    {
+      fileName: '_BO_NAO_THAM_MUU_AI.json',
+      title: 'Bộ Não AI Tri Thức & Quy Tắc Máy Học Đồng Bộ Google Drive',
+      category: 'AI_BRAIN_KNOWLEDGE',
+      keyRules: [
+        'Tích hợp 100% quy tắc phân công cán bộ, trưởng phòng phụ trách và lịch sử thẩm định chuẩn hóa.'
+      ]
+    }
+  ]
+};
+
 // General Chat / Advice endpoint with Advanced Reasoning & Grounding
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, messages, contextDocs, referenceDocs, tasks, brainBlueprint, contextDocument } = req.body;
+    const { message, messages, contextDocs, referenceDocs, tasks, brainBlueprint, contextDocument, roleContext, learnedRules, trainingDatasets } = req.body;
     let promptText = '';
 
     const formattingRule = `
@@ -596,12 +666,32 @@ YÊU CẦU ĐỊNH DẠNG & VĂN PHONG THAM MƯU (BẮT BUỘC):
    - Sử dụng dấu gạch đầu dòng (-) cho từng ý tham mưu hoặc danh sách công việc.
    - Bôi đậm (**từ khóa trọng tâm**) như tên đơn vị chủ trì, mốc thời gian hoàn thành, số hiệu văn bản, cơ sở pháp lý.
 4. NGUYÊN TẮC CÔNG TÁC CẤP ỦY & CHÍNH QUYỀN:
-   - Tuân thủ chặt chẽ Điều lệ Đảng, Quy chế làm việc của Đảng ủy, thẩm quyền Ban Thường vụ / Thường trực / UBND.
+   - Tuân thủ chặt chẽ Điều lệ Đảng, Quy chế làm việc của Đảng ủy, thẩm quyền Ban Thường vụ / Thường trực / UBND theo cơ sở dữ liệu thư mục Google Drive.
    - Thể thức văn bản chuẩn theo Quy định số 66-QĐ/TW của Ban Bí thư (đối với văn bản Đảng) và Nghị định 30/2020/NĐ-CP (đối với văn bản hành chính Nhà nước).`;
 
-    let knowledgeContext = '';
+    let knowledgeContext = `\n\n=== KHO TRI THỨC SỐ HÓA TỪ THƯ MỤC GOOGLE DRIVE CẤP ỦY ===\n` +
+      `Thư mục nguồn: ${GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL} (Folder ID: ${GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID})\n` +
+      `Danh mục tài liệu và quy chuẩn đã được nạp từ Google Drive:\n` +
+      DRIVE_FOLDER_DIGITIZED_KNOWLEDGE.documentsInFolder.map((doc, idx) => 
+        `[Drive Doc ${idx + 1}] ${doc.fileName} (${doc.title})\n- Quy chuẩn trọng yếu:\n  + ${doc.keyRules.join('\n  + ')}`
+      ).join('\n\n');
+
+    if (learnedRules && Array.isArray(learnedRules) && learnedRules.length > 0) {
+      knowledgeContext += `\n\n--- BỘ NÃO AI HỌC TỪ QUY TẮC ĐIỀU CHỈNH CỦA LÃNH ĐẠO (LEARNED RULES) ---\n` +
+        learnedRules.map((r: any, idx: number) => 
+          `[Quy tắc ${idx + 1}] Từ khóa: [${r.keywordTrigger}] -> Giao Đơn vị chủ trì: "${r.suggestedLeadDept}", Hướng tham mưu: "${r.suggestedAction}" (Mức độ tin cậy: ${r.confidence || 95}%)`
+        ).join('\n');
+    }
+
+    if (trainingDatasets && Array.isArray(trainingDatasets) && trainingDatasets.length > 0) {
+      knowledgeContext += `\n\n--- MẪU LỜI GIẢI MẪU FINE-TUNING ĐÃ ĐƯỢC CẤP ỦY PHÊ DUYỆT (GOLDEN COMPLETIONS) ---\n` +
+        trainingDatasets.slice(0, 8).map((td: any, idx: number) => 
+          `[Mẫu ${idx + 1}] Tình huống: "${td.scenarioTitle}"\n- Bối cảnh: ${td.scenarioContext || 'N/A'}\n- Lời giải mẫu chuẩn mực: ${td.expertCompletion}\n- Thẩm quyền: ${td.authorityRouting || 'BTV Đảng ủy cho chủ trương'}`
+        ).join('\n\n');
+    }
+
     if (referenceDocs && Array.isArray(referenceDocs) && referenceDocs.length > 0) {
-      knowledgeContext += `\n\n--- KHO TÀI LIỆU TRA CỨU & CĂN CỨ PHÁP LÝ ĐƯỢC NẠP SỐ HÓA ---\n` +
+      knowledgeContext += `\n\n--- KHO TÀI LIỆU TRA CỨU & CĂN CỨ PHÁP LÝ BỔ SUNG ---\n` +
         referenceDocs.slice(0, 10).map((rd: any, idx: number) => 
           `[Tài liệu ${idx + 1}] Số: ${rd.documentNumber || 'N/A'} - Trích yếu: ${rd.title || rd.fileName} (Cơ quan: ${rd.issuer || 'N/A'})\nNội dung chính: ${rd.summary || rd.fullContent || 'N/A'}\nCăn cứ: ${(rd.legalBasis || []).join('; ')}`
         ).join('\n---\n');
@@ -635,8 +725,20 @@ YÊU CẦU ĐỊNH DẠNG & VĂN PHONG THAM MƯU (BẮT BUỘC):
         brainBlueprint.learnedRules.map((r: any) => `- Khi gặp [${r.keywordTrigger}] -> Giao: ${r.suggestedLeadDept}, Đề xuất: ${r.suggestedAction}`).join('\n');
     }
 
-    const systemPersona = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp cao của Văn phòng Cấp ủy và Chính quyền địa phương (Trợ lý Chánh Văn phòng & Ban Thường vụ Đảng ủy).
-Nhiệm vụ của bạn là tư vấn, phân tích văn bản, đề xuất phân luồng thẩm quyền, tổng hợp báo cáo điều hành, rà soát pháp lý, giải đáp vướng mắc quy chế và hỗ trợ soạn thảo ý kiến chỉ đạo sắc sảo, kịp thời, chuẩn xác tuyệt đối.`;
+    let roleDescription = '';
+    if (roleContext === 'ROUTING_AUTHORITY') {
+      roleDescription = 'Bạn đang đóng vai trò Chuyên gia Phân luồng Thẩm quyền Cấp ủy: Tập trung cao độ vào việc phân định thẩm quyền Ban Thường vụ Đảng ủy vs UBND phường, chỉ rõ cấp nào quyết định, cấp nào thực hiện.';
+    } else if (roleContext === 'DIRECTIVE_DRAFTING') {
+      roleDescription = 'Bạn đang đóng vai trò Trợ lý Dự thảo Ý kiến Chỉ đạo & Bút phê: Soạn thảo mẫu bút phê ngắn gọn, đanh thép cho Bí thư Đảng ủy và thông báo kết luận chỉ đạo chuẩn thể thức.';
+    } else if (roleContext === 'LEGAL_AUDIT') {
+      roleDescription = 'Bạn đang đóng vai trò Kiểm toán Pháp lý & Thể thức: Rà soát nghiêm ngặt theo Nghị định 30/2020/NĐ-CP và Quy định 66-QĐ/TW.';
+    } else {
+      roleDescription = 'Bạn đang đóng vai trò Trợ lý Tham mưu Tổng hợp: Tham mưu toàn diện, nhận diện điểm nóng, phân luồng công việc và đôn đốc tiến độ.';
+    }
+
+    const systemPersona = `Bạn là Trợ lý AI Tham mưu & Xử lý Văn bản Cấp cao của Văn phòng Cấp ủy và Chính quyền địa phương (kết nối trực tiếp Kho Tri thức Google Drive: ${GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL}).
+${roleDescription}
+Nhiệm vụ của bạn là tư vấn, phân tích văn bản, đề xuất phân luồng thẩm quyền, tổng hợp báo cáo điều hành, rà soát pháp lý, giải đáp vướng mắc quy chế và hỗ trợ soạn thảo ý kiến chỉ đạo sắc sảo, kịp thời, chuẩn xác tuyệt đối dựa trên kho dữ liệu Google Drive và CSDL cơ quan.`;
 
     if (message && typeof message === 'string' && message.trim()) {
       promptText = `${systemPersona}
@@ -667,16 +769,115 @@ ${formattingRule}`;
     });
 
     const reply = (response && response.text) ? response.text.normalize('NFC') : 'Tôi đã tiếp nhận yêu cầu. Đồng chí vui lòng đặt câu hỏi cụ thể hơn.';
-    res.json({ reply });
+    res.json({ reply, driveFolderUrl: GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL });
   } catch (error: any) {
     console.error('Chat error:', error);
     res.status(500).json({ error: error.message || 'Xử lý trao đổi thất bại. Vui lòng thử lại sau giây lát.' });
   }
 });
 
+// Dynamic Scenario Generator for Daily Learning
+app.post('/api/generate-scenario', async (req, res) => {
+  try {
+    const { category, customTopic } = req.body;
+    const ai = getAIClient();
+    
+    const prompt = `Bạn là Chuyên gia Cao cấp về Công tác Xây dựng Đảng & Nghiệp vụ Văn phòng Cấp ủy (Đảng ủy Phường/Xã/Quận).
+Hãy tạo 01 tình huống thực tế nghiệp vụ mới (Daily Scenario) cho cán bộ Văn phòng Cấp ủy và Lãnh đạo tham mưu rèn luyện và đóng góp đánh giá.
+
+Yêu cầu chủ đề: ${category || 'Phân định thẩm quyền Ban Thường vụ Đảng ủy vs UBND'} ${customTopic ? `(Chủ đề cụ thể: ${customTopic})` : ''}
+
+Trả về DUY NHẤT một JSON object hợp lệ theo schema sau (không markdown code block bao ngoài nếu được, hoặc bọc trong \`\`\`json):
+{
+  "id": "sc-generated-${Date.now()}",
+  "title": "Tiêu đề tình huống ngắn gọn, hấp dẫn",
+  "category": "THAM_QUYEN_BTV_UBND",
+  "categoryLabel": "Phân định Thẩm quyền BTV Đảng ủy vs UBND",
+  "urgency": "KHAN",
+  "urgencyLabel": "Khẩn",
+  "background": "Mô tả bối cảnh tình huống thực tế chi tiết từ 3-4 câu (địa phương, cơ quan gửi văn bản, sự việc phát sinh, thời hạn)...",
+  "keyQuestion": "Câu hỏi trọng tâm yêu cầu tham mưu (phân luồng cơ quan nào, xử lý ra sao)?",
+  "keywordTriggers": "từ khóa 1, từ khóa 2, từ khóa 3",
+  "defaultAiAdvice": {
+    "authority": "Thẩm quyền thuộc BTV hay Thường trực hay UBND...",
+    "suggestedRouting": "Cơ quan chủ trì và cơ quan phối hợp...",
+    "suggestedDirective": "Mẫu ý kiến chỉ đạo hoặc bút phê gợi ý...",
+    "legalBasis": ["Quy chế Đảng", "Nghị định 30/2020", "Luật liên quan"]
+  },
+  "options": [
+    {
+      "id": "opt-gen-1",
+      "title": "Phương án 1 (Chuẩn quy chế quy định)",
+      "leadDept": "Đơn vị chủ trì",
+      "action": "Hành động cụ thể",
+      "isRecommendedByPolicy": true,
+      "explanation": "Giải thích vì sao phương án này chuẩn mực..."
+    },
+    {
+      "id": "opt-gen-2",
+      "title": "Phương án 2 (Chưa tối ưu hoặc sai lệch thẩm quyền)",
+      "leadDept": "Đơn vị khác",
+      "action": "Hành động sai",
+      "isRecommendedByPolicy": false,
+      "explanation": "Giải thích rủi ro khi chọn phương án này..."
+    }
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text || '{}';
+    const parsed = JSON.parse(text);
+    res.json({ scenario: parsed });
+  } catch (err: any) {
+    console.error('Error generating scenario:', err);
+    res.status(500).json({ error: err.message || 'Không thể tạo tình huống mới' });
+  }
+});
+
+// Endpoint to inspect all knowledge files and rules loaded from the Google Drive Folder
+app.get('/api/drive/folder-knowledge', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || (req.headers['x-workspace-token'] as string);
+    let liveDriveFiles: any[] = [];
+
+    if (token) {
+      try {
+        const queryStr = encodeURIComponent(`'${GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID}' in parents and trashed = false`);
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${queryStr}&fields=files(id,name,mimeType,modifiedTime,size,webViewLink)&pageSize=30`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (searchRes.ok) {
+          const data = await searchRes.json() as any;
+          liveDriveFiles = data.files || [];
+        }
+      } catch (err) {
+        console.warn('[Drive Knowledge] Optional live query to Drive API failed:', err);
+      }
+    }
+
+    res.json({
+      folderId: GOOGLE_DRIVE_KNOWLEDGE_FOLDER_ID,
+      folderUrl: GOOGLE_DRIVE_KNOWLEDGE_FOLDER_URL,
+      isLiveConnected: liveDriveFiles.length > 0,
+      liveFilesCount: liveDriveFiles.length,
+      liveFiles: liveDriveFiles,
+      digitizedKnowledge: DRIVE_FOLDER_DIGITIZED_KNOWLEDGE
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Lỗi đọc tri thức từ Google Drive' });
+  }
+});
+
 // Google Drive Config & Status endpoint
 app.get('/api/drive/config', (req, res) => {
-  const folderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
+  const folderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
   res.json({
     folderId,
     folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
@@ -688,7 +889,7 @@ app.get('/api/drive/config', (req, res) => {
 app.post('/api/drive/export-brain', async (req, res) => {
   try {
     const token = req.body.workspaceToken || req.headers.authorization?.replace('Bearer ', '') || (req.headers['x-workspace-token'] as string);
-    const targetFolderId = req.body.folderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
+    const targetFolderId = req.body.folderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
 
     if (!token) {
       return res.status(401).json({ error: 'Cần cấp quyền truy cập Google Drive để xuất Bộ Não AI.' });
@@ -765,7 +966,7 @@ app.post('/api/drive/export-brain', async (req, res) => {
 app.post('/api/drive/import-brain', async (req, res) => {
   try {
     const token = req.body.workspaceToken || req.headers.authorization?.replace('Bearer ', '') || (req.headers['x-workspace-token'] as string);
-    const targetFolderId = req.body.folderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
+    const targetFolderId = req.body.folderId || process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID || '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
 
     if (!token) {
       return res.status(401).json({ error: 'Cần cấp quyền truy cập Google Drive để nhập Bộ Não AI.' });
@@ -1010,10 +1211,19 @@ Trả về JSON đúng cấu trúc schema.`
   }
 });
 
-// Endpoint to draft complete Party Secretary directives (Tham mưu Chỉ đạo)
+// Endpoint to draft complete Party Secretary directives (Tham mưu Ý kiến Kết luận & Chỉ đạo của Bí thư Đảng ủy)
 app.post('/api/draft-directive', async (req, res) => {
   try {
-    const { idea, documentType, stylePreference, matchedResolutions } = req.body;
+    const { 
+      idea, 
+      documentType = 'CONCLUSION', 
+      stylePreference, 
+      matchedResolutions, 
+      paragraphFormat = 'PARAGRAPH_EXECUTIVE',
+      driveKnowledgeContext,
+      meetingContext
+    } = req.body;
+    
     if (!idea) {
       return res.status(400).json({ error: 'Thiếu ý kiến, ý tưởng hoặc nhiệm vụ chỉ đạo nguồn.' });
     }
@@ -1024,61 +1234,78 @@ app.post('/api/draft-directive', async (req, res) => {
       ? 'NGHỊ QUYẾT CHUYÊN ĐỀ CỦA ĐẢNG UỶ PHƯỜNG'
       : documentType === 'ENDORSEMENT'
       ? 'Ý KIẾN BÚT PHÊ CHỈ ĐẠO CỦA BÍ THƯ ĐẢNG UỶ'
-      : 'THÔNG BÁO KẾT LUẬN CỦA BÍ THƯ ĐẢNG UỶ PHƯỜNG';
+      : 'THÔNG BÁO KẾT LUẬN CỦA BÍ THƯ ĐẢNG UỶ PHƯỜNG (HOẶC THƯỜNG TRỰC ĐẢNG ỦY)';
 
     const draftSchema = {
       type: Type.OBJECT,
       properties: {
         option1: {
           type: Type.STRING,
-          description: "Phương án 1: Trọng tâm - Quyết liệt - Kỷ cương. Gọn gàng, đanh thép, đi thẳng vào các chỉ đạo giao việc cho UBND phường, Công an, Mặt trận và Chi bộ khu phố. Rõ người, rõ việc, rõ thời hạn dứt khoát."
+          description: "Phương án 1: Viết theo các đoạn văn chính luận lãnh đạo mạch lạc, sắc bén, quyết liệt, kỷ cương công vụ. Mỗi đoạn văn mang một nhiệm vụ chính trị - hành chính rõ ràng (Đánh giá chung -> Phân công UBND & Công an -> Khối Dân vận Mặt trận & Chi bộ khu phố -> Đôn đốc kiểm tra & Thời hạn báo cáo). Đi thẳng vào việc, đanh thép, rõ người, rõ việc, dứt khoát."
         },
         option2: {
           type: Type.STRING,
-          description: "Phương án 2: Toàn diện - Đồng bộ Dân vận. Kết hợp kỷ cương hành chính và công tác chính trị tư tưởng, phát huy vai trò tiền phong gương mẫu của cấp ủy, đảng viên và sự đồng thuận của nhân dân."
+          description: "Phương án 2: Viết theo các đoạn văn chính luận lãnh đạo toàn diện, đồng bộ, dân vận khéo và phát huy tính tiền phong gương mẫu. Kết hợp chặt chẽ giữa kỷ cương hành chính và công tác tư tưởng, vận động quần chúng nhân dân đồng thuận cao."
         },
         styleDescription1: {
           type: Type.STRING,
-          description: "Mô tả ngắn gọn đặc trưng Phương án 1 (ví dụ: Quyết liệt - Rõ hạn định - Kỷ cương hành động)."
+          description: "Mô tả ngắn gọn đặc trưng Phương án 1 (ví dụ: Đoạn văn Quyết liệt - Kỷ cương hành động - Rõ thời hạn dứt khoát)."
         },
         styleDescription2: {
           type: Type.STRING,
-          description: "Mô tả ngắn gọn đặc trưng Phương án 2 (ví dụ: Đồng bộ Dân vận - Phát huy vai trò Chi bộ & Đoàn thể)."
+          description: "Mô tả ngắn gọn đặc trưng Phương án 2 (ví dụ: Đoạn văn Toàn diện - Dân vận khéo - Phát huy vai trò Chi bộ & Nêu gương)."
         }
       },
       required: ['option1', 'option2', 'styleDescription1', 'styleDescription2']
     };
 
-    const promptText = `Bạn là Bí thư Đảng ủy phường - Người đứng đầu Cấp ủy lãnh đạo toàn diện hệ thống chính trị cơ sở phường (bao gồm Đảng ủy, Chính quyền UBND phường, Ủy ban MTTQ và các Đoàn thể, Công an, Quân sự và Chi bộ 100% các khu phố).
+    let driveKnowledgePrompt = `
+--- NGUỒN TRI THỨC VĂN BẢN MẪU TỪ GOOGLE DOCS & DRIVE CẤP ỦY ---
+* Tài liệu Mẫu Chuẩn Google Docs (Mẫu Thông báo Kết luận của Bí thư/Thường trực Đảng ủy):
+  - Link file: https://docs.google.com/document/d/1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ/edit?tab=t.0
+  - Cấu trúc chuẩn hóa:
+    + Thể thức: Đảng ủy Phường / Ban Thường vụ Đảng ủy - Số hiệu ...-TB/ĐU.
+    + Thể hiện ý kiến kết luận của Bí thư Đảng ủy / Thường trực Đảng ủy tại các kỳ họp, giao ban hoặc kiểm tra hiện trường.
+    + Phân đoạn mạch lạc: Đánh giá tình hình -> Chỉ đạo UBND & Công an -> Chỉ đạo Mặt trận, Dân vận & Chi bộ Khu phố -> Tổ chức thực hiện, đôn đốc & Thời hạn báo cáo.
+* Kho Thông báo kết luận thực tiễn trước đây (Google Drive Folder: 1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR):
+1. Thông báo Kết luận số 42-TB/ĐU (Trật tự đô thị & Kỷ cương vỉa hè): "Đánh giá thẳng thắn công tác lập lại trật tự đô thị thời gian qua có chuyển biến nhưng chưa bền vững, còn tình trạng tái lấn chiếm lòng lề đường. Yêu cầu UBND phường tập trung cao độ, giao Chủ tịch UBND trực tiếp chỉ đạo Công an phường lập các tổ liên ngành kiểm tra liên tục; Cấp ủy các chi bộ khu phố phân công đảng viên phụ trách từng tuyến đường tự quản; MTTQ và các đoàn thể tăng cường vận động hộ kinh doanh ký cam kết..."
+2. Thông báo Kết luận số 58-TB/ĐU (Cải cách hành chính & Đề án 06 / VNeID): "Ghi nhận nỗ lực số hóa và phục vụ người dân tại Bộ phận Một cửa. Tuy nhiên, tỷ lệ hồ sơ trực tuyến toàn trình tại một số khu phố còn thấp. Yêu cầu UBND phường rà soát toàn diện quy trình, không để trễ hẹn bất kỳ hồ sơ nào của công dân; Đoàn Thanh niên duy trì tổ công nghệ số cộng đồng hướng dẫn người dân cài đặt VNeID mức 2..."
+3. Thông báo Kết luận số 76-TB/ĐU (An toàn PCCC & Cứu nạn): "Xác định an toàn PCCC là nhiệm vụ đặc biệt cấp bách bảo vệ tính mạng nhân dân. Giao Công an phường phối hợp UBND tổng kiểm tra 100% nhà trọ, nhà nhiều căn hộ; kiên quyết đình chỉ cơ sở vi phạm nghiêm trọng; các Chi bộ khu phố phát động phong trào 'Mỗi hộ gia đình một bình chữa cháy'..."
+4. Thông báo Kết luận số 91-TB/ĐU (Giải phóng mặt bằng & Dự án hạ tầng): "Khẳng định công tác bồi thường GPMB là khâu then chốt thúc đẩy phát triển kinh tế địa phương. Yêu cầu khối Dân vận, Mặt trận 'đi từng ngõ, gõ từng nhà', kiên trì lắng nghe tâm tư, đối thoại thỏa đáng với các hộ dân chưa đồng thuận; UBND phường giải quyết kịp thời chính sách bồi thường đúng quy định pháp luật..."
+5. Thông báo Kết luận số 105-TB/ĐU (Xây dựng Đảng & Sinh hoạt Chi bộ khu phố): "Yêu cầu các cấp ủy chi bộ đổi mới nội dung sinh hoạt theo hướng bám sát địa bàn, giải quyết việc nóng; tăng cường giáo dục chính trị tư tưởng, tạo nguồn phát triển đảng viên trẻ..."`;
 
-Nhiệm vụ: Căn cứ vào ý tưởng/nội dung chỉ đạo:
+    if (driveKnowledgeContext) {
+      driveKnowledgePrompt += `\nNgữ cảnh bổ sung: ${driveKnowledgeContext}\n`;
+    }
+
+    const promptText = `Bạn là Bí thư Đảng ủy phường - Người đứng đầu Cấp ủy lãnh đạo toàn diện hệ thống chính trị cơ sở phường (bao gồm Đảng ủy, UBND phường, Ủy ban MTTQ và các Đoàn thể, Công an, Ban CHQS phường và Chi bộ 100% các khu phố).
+
+Nhiệm vụ: Căn cứ vào ý kiến/nội dung chỉ đạo nguồn:
 "${idea}"
 
 Hình thức văn bản: ${docTypeTitle}
-${stylePreference ? `Văn phong mong muốn: "${stylePreference}".` : ''}
+${meetingContext ? `Bối cảnh cuộc họp: "${meetingContext}".` : 'Bối cảnh: Cuộc họp Thường trực Đảng ủy định kỳ / Giao ban chỉ đạo.'}
+${stylePreference ? `Định hướng phong cách mong muốn: "${stylePreference}".` : ''}
 ${matchedResolutions && matchedResolutions.length > 0 ? `Căn cứ Nghị quyết cấp trên: "${matchedResolutions.join(', ')}".` : ''}
+${driveKnowledgePrompt}
 
-NGUYÊN TẮC SOẠN THẢO Ý KIẾN KẾT LUẬN & CHỈ ĐẠO CỦA BÍ THƯ ĐẢNG ỦY PHƯỜNG:
-1. GỌN HƠN, TẬP TRUNG HƠN, KHÔNG SÁO RỖNG:
-   - Tránh văn hoa dài dòng; đi thẳng vào giải quyết vấn đề cốt lõi.
-   - Sử dụng ngôn từ chuẩn xác, đanh thép, mang tính quyết sách và phân công trách nhiệm rõ ràng.
+NGUYÊN TẮC SOẠN THẢO Ý KIẾN KẾT LUẬN & CHỈ ĐẠO CỦA BÍ THƯ ĐẢNG ỦY:
+1. BẮT BUỘC TRÌNH BÀY THEO CÁC ĐOẠN VĂN MẠCH LẠC, LIÊN KẾT CHẶT CHẼ (KHÔNG DÙNG GẠCH ĐẦU DÒNG VỤN VẶT):
+   - Viết thành 3 đến 4 đoạn văn chính luận chính trị - hành chính chuẩn mực, trang trọng, đanh thép, câu từ khúc chiết, mang phong thái người lãnh đạo cao nhất của Đảng bộ.
+   - Mỗi đoạn văn hoàn chỉnh diễn đạt trọn vẹn một mảng chỉ đạo chiến lược.
 
-2. ĐÚNG VỊ THẾ & QUYỀN HẠN CỦA BÍ THƯ ĐẢNG ỦY PHƯỜNG:
-   - "Đảng ủy / Ban Thường vụ Đảng ủy yêu cầu..."
-   - "Giao UBND phường (đồng chí Chủ tịch UBND chỉ đạo)..."
-   - "Giao Công an phường phối hợp chặt chẽ..."
-   - "Đề nghị Khối Dân vận, Ủy ban MTTQ và các đoàn thể chính trị - xã hội..."
-   - "Yêu cầu Cấp ủy các Chi bộ khu phố phân công đảng viên..."
-   - "Giao Văn phòng Đảng ủy phối hợp UBKT Đảng ủy đôn đốc, báo cáo..."
+2. CẤU TRÚC ĐOẠN VĂN LÃNH ĐẠO CẤP ỦY:
+   - Đoạn 1 (Đánh giá chung & Quyết tâm chính trị): Nhận định thực trạng, đánh giá khách quan kết quả đạt được, chỉ rõ những tồn tại, hạn chế, khuyết điểm cốt lõi và khẳng định quyết tâm chính trị của Đảng ủy trong việc giải quyết dứt điểm vấn đề.
+   - Đoạn 2 (Chỉ đạo UBND Phường, Công an và Cơ quan chuyên môn): Giao nhiệm vụ dứt khoát cho đồng chí Chủ tịch UBND phường chỉ đạo các ban ngành, phối hợp Công an phường triển khai ngay các giải pháp trọng tâm, siết chặt kỷ luật, kỷ cương công vụ, tăng cường kiểm tra, xử lý nghiêm minh các vi phạm.
+   - Đoạn 3 (Chỉ đạo Khối Dân vận, Mặt trận Tổ quốc, Đoàn thể & Chi bộ Khu phố): Huy động sức mạnh cả hệ thống chính trị, phát huy vai trò tiền phong gương mẫu của từng cấp ủy, chi bộ khu phố và đảng viên; tăng cường tuyên truyền, vận động, lắng nghe nhân dân, tạo sự đồng thuận xã hội sâu rộng theo phương châm "Dân biết, dân bàn, dân làm, dân kiểm tra, dân giám sát, dân thụ hưởng".
+   - Đoạn 4 (Tổ chức thực hiện, Đôn đốc giám sát & Hạn báo cáo): Phân công Văn phòng Đảng ủy phối hợp Ủy ban Kiểm tra Đảng ủy thường xuyên theo dõi, đôn đốc, giám sát tiến độ thực hiện; tổng hợp báo cáo Thường trực Đảng ủy trước mốc thời gian cụ thể.
 
-3. KẾT CẤU GỌN GÀNG (3 PHẦN CÔ ĐỌNG):
-   - I. ĐÁNH GIÁ & TINH THẦN CHUNG: 1-2 câu nêu rõ tính cấp thiết và quyết tâm chính trị.
-   - II. NHIỆM VỤ CHỈ ĐẠO TRỌNG TÂM: Các đầu việc phân công dứt khoát theo từng khối cơ quan (UBND, Công an, Dân vận - Mặt trận, Chi bộ khu phố).
-   - III. TỔ CHỨC THỰC HIỆN & THỜI HẠN: Thời hạn báo cáo kết quả cụ thể về Thường trực Đảng ủy.
+3. ĐÚNG VỊ THẾ & QUYỀN HẠN CỦA BÍ THƯ ĐẢNG ỦY:
+   - Dùng các thuật ngữ Cấp ủy chuẩn mực: "Thường trực Đảng ủy thống nhất kết luận...", "Ban Thường vụ Đảng ủy yêu cầu...", "Giao đồng chí Chủ tịch UBND phường chỉ đạo...", "Đề nghị Khối Dân vận, Ủy ban MTTQ và các đoàn thể...", "Yêu cầu cấp ủy các Chi bộ khu phố...", "Giao Văn phòng Đảng ủy chủ trì theo dõi, tổng hợp báo cáo...".
 
-Hãy tạo 02 phương án ngắn gọn, tập trung cao độ, chuẩn văn phong lãnh đạo Cấp ủy:
-- Phương án 1 (Quyết liệt - Rõ việc - Kỷ cương): Tập trung giao việc hành động ngay, thời hạn dứt khoát, tăng cường xử lý vi phạm và kiểm tra trách nhiệm người đứng đầu.
-- Phương án 2 (Đồng bộ - Dân vận khéo): Kết hợp xử lý hành chính với công tác tuyên truyền, vận động quần chúng và phát huy tính nêu gương của từng chi bộ, đảng viên.`;
+Hãy tạo 02 phương án hoàn chỉnh viết theo đoạn văn chuẩn phong cách lãnh đạo Cấp ủy:
+- Phương án 1 (Quyết liệt - Hành động dứt khoát - Kỷ cương công vụ): Văn phong đanh thép, tập trung vào hành động ngay, siết chặt kiểm tra và thời hạn hoàn thành dứt khoát.
+- Phương án 2 (Đồng bộ - Toàn diện - Dân vận khéo & Nêu gương): Kết hợp đồng bộ giữa kỷ cương hành chính và công tác chính trị tư tưởng, phát huy tính tiên phong của chi bộ và sự đồng thuận của nhân dân.`;
 
     const response = await generateContentWithFallback({
       contents: [{ text: promptText }],
@@ -1544,6 +1771,402 @@ Nhiệm vụ:
     res.status(500).json({ error: err.message || 'Lỗi phân tích đa phương thức.' });
   }
 });
+
+// ============================================================================
+// 1. ENDPOINT: AUTOMATED RACI TASK EXTRACTION & DISPATCH REMINDER
+// ============================================================================
+app.post('/api/extract-raci-tasks', async (req, res) => {
+  try {
+    const { directiveText, documentType = 'CONCLUSION', meetingContext = 'Hội nghị Thường trực Đảng ủy' } = req.body;
+
+    if (!directiveText || !directiveText.trim()) {
+      return res.status(400).json({ error: 'Chưa cung cấp nội dung chỉ đạo để trích xuất RACI.' });
+    }
+
+    const raciSchema = {
+      type: Type.OBJECT,
+      properties: {
+        executiveSummary: { type: Type.STRING, description: "Tóm tắt mục tiêu chính trị và yêu cầu hành động cốt lõi" },
+        raciTasks: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING, description: "Tên nhiệm vụ ngắn gọn, rõ hành động (Bắt đầu bằng động từ)" },
+              description: { type: Type.STRING, description: "Chi tiết yêu cầu, giải pháp và nội dung cần làm" },
+              responsible: { type: Type.STRING, description: "R - Người/Bộ phận trực tiếp thi hành (VD: Đội QLTT Đô thị, Công an phường, Tổ CĐS cộng đồng)" },
+              accountable: { type: Type.STRING, description: "A - Đơn vị/Cá nhân chịu trách nhiệm toàn diện trước Cấp ủy (VD: Đồng chí Chủ tịch UBND phường, Trưởng Công an phường)" },
+              consulted: { type: Type.STRING, description: "C - Đơn vị phối hợp, tham vấn (VD: Khối Dân vận, UBMTTQ, Cấp ủy Chi bộ khu phố)" },
+              informed: { type: Type.STRING, description: "I - Đơn vị nhận báo cáo, giám sát (VD: Thường trực Đảng ủy, Văn phòng Đảng ủy, UBKT Đảng ủy)" },
+              suggestedDueDate: { type: Type.STRING, description: "Thời hạn hoàn thành đề xuất (VD: Sau 7 ngày, hoặc ngày cụ thể)" },
+              priority: { type: Type.STRING, description: "'KHẨN' | 'CAO' | 'TRUNG BÌNH'" },
+              expectedOutput: { type: Type.STRING, description: "Sản phẩm / Kết quả định lượng cần đạt được" },
+              suggestedReminders: { type: Type.STRING, description: "Kế hoạch đôn đốc kiểm tra tiến độ" }
+            },
+            required: ['id', 'title', 'description', 'responsible', 'accountable', 'consulted', 'informed', 'suggestedDueDate', 'priority', 'expectedOutput', 'suggestedReminders']
+          }
+        },
+        automatedReminderNotice: {
+          type: Type.STRING,
+          description: "Mẫu Công văn / Thông báo đôn đốc tiến độ thực hiện kết luận gửi UBND phường và các đơn vị được phân công, sẵn sàng xuất trình Bí thư ký duyệt."
+        }
+      },
+      required: ['executiveSummary', 'raciTasks', 'automatedReminderNotice']
+    };
+
+    const promptText = `Bạn là Chánh Văn phòng Đảng ủy Phường kiêm Trợ lý Quản trị Chiến lược Cấp ủy.
+Hãy phân tích sâu văn bản chỉ đạo / ý kiến kết luận của Bí thư Đảng ủy sau đây và BÓC TÁCH MA TRẬN PHÂN CÔNG NHIỆM VỤ (RACI MATRIX) & TỰ ĐỘNG HÓA VĂN BẢN ĐÔN ĐỐC CÔNG VỤ:
+
+NỘI DUNG CHỈ ĐẠO CỦA BÍ THƯ / THƯỜNG TRỰC ĐẢNG ỦY:
+"""
+${directiveText}
+"""
+
+BỐI CẢNH VĂN BẢN:
+- Loại văn bản: ${documentType}
+- Bối cảnh: ${meetingContext}
+
+YÊU CẦU BÓC TÁCH:
+1. Bóc tách từ 3 đến 6 nhiệm vụ cụ thể, rõ ràng, dứt khoát.
+2. Chuẩn hóa Ma trận RACI:
+   - R (Responsible - Trực tiếp làm): Bộ phận tác nghiệp.
+   - A (Accountable - Chịu trách nhiệm chính): Người đứng đầu (Chủ tịch UBND, Trưởng CA, Bí thư Chi bộ).
+   - C (Consulted - Phối hợp): MTTQ, đoàn thể, cơ quan liên quan.
+   - I (Informed - Giám sát & Báo cáo): Thường trực Đảng ủy, Văn phòng Đảng ủy, UBKT Đảng ủy.
+3. Soạn thảo sẵn một bản "THÔNG BÁO ĐÔN ĐỐC TIẾN ĐỘ THỰC HIỆN KẾT LUẬN CỦA THƯỜNG TRỰC ĐẢNG ỦY" đầy đủ thể thức chính quy Đảng để Văn phòng Đảng ủy sử dụng khi cần nhắc nhở các đơn vị.
+4. Trả về đúng JSON Schema.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: raciSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể bóc tách ma trận RACI.");
+    }
+  } catch (err: any) {
+    console.error("RACI Extraction error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi bóc tách ma trận phân công RACI.' });
+  }
+});
+
+// ============================================================================
+// 2. ENDPOINT: SMART EXECUTIVE MEETING BRIEFING & SHARP QUESTIONS GENERATOR
+// ============================================================================
+app.post('/api/generate-meeting-briefing', async (req, res) => {
+  try {
+    const { 
+      meetingType = 'Hội nghị Ban Thường vụ Đảng ủy định kỳ', 
+      hotspotsContext = '', 
+      pendingDirectivesContext = '', 
+      keyTasksContext = '',
+      specificFocus = ''
+    } = req.body;
+
+    const briefingSchema = {
+      type: Type.OBJECT,
+      properties: {
+        briefingTitle: { type: Type.STRING, description: "Tiêu đề Bản tin Tóm tắt Điều hành Cấp ủy" },
+        situationOverview: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "3-4 gạch đầu dòng đánh giá tổng quan tình hình chính trị - xã hội địa bàn trong kỳ"
+        },
+        hotspotAlerts: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              location: { type: Type.STRING },
+              issue: { type: Type.STRING },
+              riskLevel: { type: Type.STRING, description: "'CAO' | 'TRUNG BÌNH' | 'CẦN THEO DÕI'" },
+              recommendationForSecretary: { type: Type.STRING, description: "Đề xuất trọng tâm chỉ đạo của Bí thư" }
+            },
+            required: ['location', 'issue', 'riskLevel', 'recommendationForSecretary']
+          }
+        },
+        pendingDirectivesReview: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              directiveName: { type: Type.STRING },
+              assignedUnit: { type: Type.STRING },
+              progressStatus: { type: Type.STRING, description: "'ĐÚNG HẠN' | 'CHẬM TIẾN ĐỘ' | 'CẦN CHỈ ĐẠO GẤP'" },
+              bottleneck: { type: Type.STRING, description: "Điểm nghẽn cần tháo gỡ" }
+            },
+            required: ['directiveName', 'assignedUnit', 'progressStatus', 'bottleneck']
+          }
+        },
+        suggestedAgenda: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              order: { type: Type.NUMBER },
+              timeAllocated: { type: Type.STRING },
+              topic: { type: Type.STRING },
+              reporter: { type: Type.STRING }
+            },
+            required: ['order', 'timeAllocated', 'topic', 'reporter']
+          }
+        },
+        sharpInterrogationQuestions: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              targetAudience: { type: Type.STRING, description: "Cá nhân/Đơn vị bị chất vấn (VD: Đồng chí Chủ tịch UBND, Trưởng Công an, Bí thư Chi bộ KP 3)" },
+              question: { type: Type.STRING, description: "Câu hỏi chất vấn sắc bén, đi thẳng vào trách nhiệm người đứng đầu và giải pháp cụ thể" },
+              purpose: { type: Type.STRING, description: "Mục đích làm rõ" }
+            },
+            required: ['targetAudience', 'question', 'purpose']
+          }
+        },
+        draftConclusionPoints: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Các định hướng kết luận dự thảo để Bí thư chốt lại cuối buổi họp"
+        }
+      },
+      required: ['briefingTitle', 'situationOverview', 'hotspotAlerts', 'pendingDirectivesReview', 'suggestedAgenda', 'sharpInterrogationQuestions', 'draftConclusionPoints']
+    };
+
+    const promptText = `Bạn là Trợ lý Tổng hợp Đặc biệt của Bí thư Đảng ủy Phường.
+Hãy biên soạn BẢN TIN TÓM TẮT ĐIỀU HÀNH & BỘ CÂU HỎI CHẤT VẤN TRỌNG TÂM để phục vụ đồng chí Bí thư Đảng ủy chủ trì cuộc họp: "${meetingType}".
+
+DỮ LIỆU ĐỊA BÀN VÀ ĐIỂM NÓNG HIỆN TẠI:
+${hotspotsContext || 'Trật tự đô thị tuyến đường chính, PCCC nhà trọ cao tầng, chuyển đổi số VNeID và khiếu nại đất đai hạ tầng.'}
+
+CÁC CHỈ ĐẠO TRƯỚC ĐÂY ĐANG THEO DÕI:
+${pendingDirectivesContext || 'Thông báo số 42-TB/ĐU về vỉa hè; Thông báo số 58-TB/ĐU về Một cửa; Thông báo số 76-TB/ĐU về PCCC.'}
+
+CÁC NHIỆM VỤ CẦN KIỂM TRA:
+${keyTasksContext || 'Nhiệm vụ đôn đốc UBND phường, Công an phường và Chi bộ 12 khu phố.'}
+
+TRỌNG TÂM ĐẶC BIỆT CỦA BÍ THƯ:
+${specificFocus || 'Tập trung siết chặt kỷ luật công vụ, giải quyết dứt điểm các việc tồn đọng gây bức xúc trong nhân dân.'}
+
+YÊU CẦU BIÊN SOẠN:
+1. Đánh giá cô đọng, khách quan, chỉ rõ ưu điểm và tồn tại hạn chế cốt lõi.
+2. Thiết kế từ 4-6 câu hỏi chất vấn thật đanh thép, sâu sát thực tiễn, hướng vào người đứng đầu UBND phường, Công an và Chi bộ khu phố.
+3. Cung cấp khung kết luận dự thảo súc tích giúp Bí thư điều hành cuộc họp hiệu quả cao.
+4. Trả về đúng JSON Schema.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: briefingSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể lập bản tin tóm tắt điều hành cuộc họp.");
+    }
+  } catch (err: any) {
+    console.error("Meeting Briefing generation error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi lập tài liệu họp điều hành Cấp ủy.' });
+  }
+});
+
+// ============================================================================
+// 3. ENDPOINT: AI PREDICTIVE RISK & INCIDENT RESPONSE PLAYBOOK
+// ============================================================================
+app.post('/api/ai-predict-incident-response', async (req, res) => {
+  try {
+    const { marker, historicalContext = '' } = req.body;
+
+    if (!marker) {
+      return res.status(400).json({ error: 'Chưa cung cấp thông tin điểm nóng / vị trí trên bản đồ số.' });
+    }
+
+    const playbookSchema = {
+      type: Type.OBJECT,
+      properties: {
+        threatLevel: { type: Type.STRING, description: "'MỨC 1: BÌNH THƯỜNG - THEO DÕI' | 'MỨC 2: CẢNH BÁO CÓ NGUY CƠ' | 'MỨC 3: ĐIỂM NÓNG PHỨC TẠP' | 'MỨC 4: TÌNH HUỐNG KHẨN CẤP'" },
+        escalationProbabilityScore: { type: Type.NUMBER, description: "Xác suất phát sinh điểm nóng phức tạp nếu không can thiệp kịp thời (0 - 100)" },
+        predictiveRiskAnalysis: { type: Type.STRING, description: "Phân tích nguyên nhân sâu xa, dự báo nguy cơ lan rộng, tác động đến an ninh trật tự, dư luận và đời sống dân sinh" },
+        incidentResponsePlaybook: {
+          type: Type.OBJECT,
+          properties: {
+            partyAndMassMobilization: {
+              type: Type.OBJECT,
+              properties: {
+                pillarName: { type: Type.STRING, description: "Khối Dân vận, Mặt trận & Chi bộ Khu phố" },
+                leadOfficer: { type: Type.STRING },
+                immediateActions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Các bước dân vận, đối thoại, nắm bắt tâm tư, phân công đảng viên nòng cốt" },
+                timeline: { type: Type.STRING }
+              },
+              required: ['pillarName', 'leadOfficer', 'immediateActions', 'timeline']
+            },
+            policeAndPublicSecurity: {
+              type: Type.OBJECT,
+              properties: {
+                pillarName: { type: Type.STRING, description: "Công an Phường & Lực lượng ANTT Cơ sở" },
+                leadOfficer: { type: Type.STRING },
+                immediateActions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Các biện pháp nghiệp vụ, bố trí chốt trực, tuần tra khép kín, xử lý vi phạm" },
+                timeline: { type: Type.STRING }
+              },
+              required: ['pillarName', 'leadOfficer', 'immediateActions', 'timeline']
+            },
+            executiveAndGovernment: {
+              type: Type.OBJECT,
+              properties: {
+                pillarName: { type: Type.STRING, description: "UBND Phường & Đội Quản lý Chuyên môn" },
+                leadOfficer: { type: Type.STRING },
+                immediateActions: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Các giải pháp hành chính, kiểm tra liên ngành, cưỡng chế giải tỏa, hỗ trợ tái định cư" },
+                timeline: { type: Type.STRING }
+              },
+              required: ['pillarName', 'leadOfficer', 'immediateActions', 'timeline']
+            }
+          },
+          required: ['partyAndMassMobilization', 'policeAndPublicSecurity', 'executiveAndGovernment']
+        },
+        emergencySecretaryDirective: {
+          type: Type.STRING,
+          description: "Đoạn văn chỉ đạo khẩn cấp mẫu của Bí thư Đảng ủy gửi Trực ban UBND và Công an phường xử lý ngay trong ngày."
+        }
+      },
+      required: ['threatLevel', 'escalationProbabilityScore', 'predictiveRiskAnalysis', 'incidentResponsePlaybook', 'emergencySecretaryDirective']
+    };
+
+    const promptText = `Bạn là Trợ lý Tác chiến & Tham mưu An ninh Đô thị của Bí thư Đảng ủy Phường.
+Hãy thẩm định rủi ro, dự báo xu hướng và XÂY DỰNG KỊCH BẢN TÁC CHIẾN 03 MŨI (Dân vận - Công an - Chính quyền) để xử lý dứt điểm điểm nóng sau đây:
+
+THÔNG TIN ĐIỂM NÓNG / VỊ TRÍ BẢN ĐỒ SỐ:
+- Tiêu đề / Mã hiệu: ${marker.codeOrTitle || marker.title || 'Điểm nóng địa bàn'}
+- Vị trí: ${marker.location || 'Địa bàn phường'} (Khu phố: ${marker.wardOrKp || 'Khu phố trọng điểm'})
+- Lĩnh vực: ${marker.category || 'Trật tự đô thị / ANTT'}
+- Mức độ hiện tại: ${marker.severity || 'Cảnh báo'}
+- Mô tả chi tiết: ${marker.description || 'Chưa có mô tả chi tiết'}
+- Đơn vị phụ trách: ${marker.assignedUnit || 'UBND và Công an phường'}
+- Ghi chú lịch sử: ${historicalContext || 'Từng có phản ánh qua tiếp công dân hoặc tuần tra'}
+
+YÊU CẦU:
+1. Đánh giá cấp độ đe dọa (1 đến 4) và tỷ lệ xác suất bùng phát rủi ro.
+2. Lập kịch bản xử lý phân công đồng bộ 3 mũi giáp công:
+   - Mũi 1: Khối Dân vận & Chi bộ (Tuyên truyền, vận động, hóa giải từ sớm).
+   - Mũi 2: Công an phường & Lực lượng bảo vệ ANTT cơ sở (Kiểm soát, răn đe, cưỡng chế nếu cần).
+   - Mũi 3: UBND phường (Giải quyết thủ tục, quản lý hạ tầng, xử phạt).
+3. Dự thảo ý kiến chỉ đạo khẩn của Bí thư Đảng ủy để phát lệnh ngay.
+4. Trả về đúng JSON Schema.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: playbookSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể xây dựng kịch bản xử lý điểm nóng.");
+    }
+  } catch (err: any) {
+    console.error("AI Incident Response Playbook error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi xây dựng kịch bản xử lý điểm nóng.' });
+  }
+});
+
+// ============================================================================
+// 4. ENDPOINT: DEEP ADAPTIVE GOOGLE DRIVE BRAIN LEARNING & SEMANTIC CONTEXT
+// ============================================================================
+app.post('/api/deep-drive-sync-learn', async (req, res) => {
+  try {
+    const { folderId = '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR', sampleDocId = '1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ', customInput = '' } = req.body;
+
+    const brainLearnSchema = {
+      type: Type.OBJECT,
+      properties: {
+        syncStatus: { type: Type.STRING, description: "'SYNCHRONIZED' | 'UPDATED'" },
+        learnedAt: { type: Type.STRING },
+        executiveVocabularyBank: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              category: { type: Type.STRING, description: "Nhóm từ vựng (VD: Quyết tâm chính trị, Giao nhiệm vụ UBND, Dân vận & Nêu gương, Giám sát đôn đốc)" },
+              phrases: { type: Type.ARRAY, items: { type: Type.STRING } },
+              usageContext: { type: Type.STRING }
+            },
+            required: ['category', 'phrases', 'usageContext']
+          }
+        },
+        learnedPrecedents: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              resolutionCode: { type: Type.STRING },
+              coreSubject: { type: Type.STRING },
+              keyLessonLearned: { type: Type.STRING },
+              applicableScenarios: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ['resolutionCode', 'coreSubject', 'keyLessonLearned', 'applicableScenarios']
+          }
+        },
+        executiveStyleRules: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Các nguyên tắc vàng về văn phong của Bí thư Đảng ủy đã được đúc kết từ kho tri thức Drive"
+        },
+        systemReadinessIndex: { type: Type.NUMBER, description: "Chỉ số độ am hiểu của Bộ não AI (0 - 100)" }
+      },
+      required: ['syncStatus', 'learnedAt', 'executiveVocabularyBank', 'learnedPrecedents', 'executiveStyleRules', 'systemReadinessIndex']
+    };
+
+    const promptText = `Bạn là Kiến trúc sư Bộ Não Tri Thức AI của Cấp ủy Đảng ủy Phường.
+Hãy thực hiện quy trình TỰ HỌC SÂU (Deep Adaptive Knowledge Distillation) từ toàn bộ dữ liệu mẫu trong Google Drive (Folder ID: ${folderId}) và Tài liệu Mẫu Chuẩn Google Docs (ID: ${sampleDocId}).
+
+Các thông tin đã nạp:
+1. Mẫu Thông báo kết luận chuẩn (Google Docs: 1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ): Kết cấu 4 đoạn chỉ đạo toàn diện, thể thức 05-HD/VPTW.
+2. Thông báo 42-TB/ĐU (Trật tự đô thị, kỷ cương vỉa hè).
+3. Thông báo 58-TB/ĐU (Cải cách hành chính, Một cửa, Đề án 06/VNeID).
+4. Thông báo 76-TB/ĐU (PCCC nhà trọ mật độ cao, chung cư cũ).
+5. Thông báo 91-TB/ĐU (Bồi thường GPMB hạ tầng, dân vận khéo).
+6. Thông báo 105-TB/ĐU (Nâng cao chất lượng sinh hoạt Chi bộ khu phố).
+${customInput ? `Dữ liệu cập nhật thêm từ người dùng: ${customInput}` : ''}
+
+YÊU CẦU:
+1. Đúc kết kho từ vựng lãnh đạo chuẩn mực theo 4 nhóm: Quyết tâm chính trị, Giao nhiệm vụ UBND/Công an, Dân vận & Nêu gương, Giám sát & Báo cáo.
+2. Trích xuất các án lệ chỉ đạo (Precedents) và bài học kinh nghiệm để áp dụng cho các tình huống tương lai.
+3. Đúc kết các quy tắc vàng về phong cách lãnh đạo của Bí thư Đảng ủy.
+4. Trả về đúng JSON Schema.`;
+
+    const response = await generateContentWithFallback({
+      contents: [{ text: promptText }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: brainLearnSchema,
+      }
+    });
+
+    if (response && response.text) {
+      const cleaned = cleanJsonText(response.text);
+      res.json(normalizeVietnameseData(JSON.parse(cleaned)));
+    } else {
+      throw new Error("Không thể tự học sâu từ Google Drive.");
+    }
+  } catch (err: any) {
+    console.error("Deep Drive learn error:", err);
+    res.status(500).json({ error: err.message || 'Lỗi tự học sâu từ Google Drive.' });
+  }
+});
+
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

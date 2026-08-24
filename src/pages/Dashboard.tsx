@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { 
   UploadCloud, FileText, AlertCircle, Loader2, CheckCircle2, 
   Clock, ChevronRight, ShieldAlert, Building2, Sparkles, 
-  ExternalLink, HardDrive, FileCheck, RefreshCw
+  ExternalLink, HardDrive, FileCheck, RefreshCw, Award, Star, Brain, ArrowRight
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
@@ -13,8 +13,9 @@ import { Document, Task } from '../types';
 import { TaskReminderToasts, TaskReminderAlertBanner } from '../components/TaskReminderToasts';
 import ImportantDocumentsSection from '../components/ImportantDocumentsSection';
 import DocumentProgressChart from '../components/DocumentProgressChart';
+import { getContributorProfile, DAILY_SCENARIOS_BANK } from '../lib/learningEngine';
 
-const TARGET_DRIVE_FOLDER_ID = '1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY';
+const TARGET_DRIVE_FOLDER_ID = '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
 const TARGET_DRIVE_FOLDER_URL = `https://drive.google.com/drive/folders/${TARGET_DRIVE_FOLDER_ID}`;
 
 export default function Dashboard() {
@@ -214,43 +215,46 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16 font-sans">
-      {/* Government Digital Service Portal Header Banner */}
-      <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 rounded-2xl p-6 text-white border border-blue-700/60 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-400/20 via-transparent to-transparent pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-200 border border-blue-600/60 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Cổng Dịch vụ công & Điều hành Điện tử Cấp ủy
-              </span>
-              <span className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold uppercase tracking-wider">
-                Phiên bản V2.5 Chuyên nghiệp
-              </span>
+      {/* Government Digital Service Portal Header Banner with Google Studio Flowing Gradient Border */}
+      <div className="google-studio-border google-studio-glow">
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 rounded-[calc(1.25rem-2px)] p-6 text-white relative overflow-hidden shadow-lg shadow-blue-500/10">
+          <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/15 via-sky-300/10 to-transparent pointer-events-none"></div>
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full bg-white/20 text-white border border-white/30 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-xs backdrop-blur-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+                  Cổng Dịch vụ công & Điều hành Điện tử Cấp ủy
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-amber-400/25 text-amber-200 border border-amber-300/40 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 backdrop-blur-xs">
+                  <Sparkles className="w-3 h-3 text-amber-300" />
+                  Google AI Studio V2.5
+                </span>
+              </div>
+              <h1 className="text-xl md:text-2xl font-black text-white tracking-tight drop-shadow-xs">
+                Hệ thống Tiếp nhận, Thẩm định & Điều hành Văn bản Thông minh
+              </h1>
+              <p className="text-xs text-blue-50 max-w-2xl leading-relaxed font-medium">
+                Cung cấp giải pháp số hóa toàn diện thủ tục hành chính Đảng, tự động hóa trích xuất công văn, đôn đốc nhiệm vụ trọng tâm và trợ lý ảo điều hành 24/7 dành cho Thường trực và Văn phòng Cấp ủy.
+              </p>
             </div>
-            <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
-              Hệ thống Tiếp nhận, Thẩm định & Điều hành Văn bản Thông minh
-            </h1>
-            <p className="text-xs text-blue-100 max-w-2xl leading-relaxed">
-              Cung cấp giải pháp số hóa toàn diện thủ tục hành chính Đảng, tự động hóa trích xuất công văn, đôn đốc nhiệm vụ trọng tâm và trợ lý ảo điều hành 24/7 dành cho Thường trực và Văn phòng Cấp ủy.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
-            <Link
-              to="/documents"
-              className="px-4 py-2.5 bg-blue-800/90 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all border border-blue-600/70 flex items-center gap-2 shadow-sm cursor-pointer"
-            >
-              <FileText className="w-4 h-4 text-blue-200" />
-              <span>Sổ Văn bản đến</span>
-            </Link>
-            <Link
-              to="/tasks"
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-600/30 flex items-center gap-2 cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Nhiệm vụ đôn đốc</span>
-            </Link>
+            <div className="flex flex-wrap gap-2.5 flex-shrink-0">
+              <Link
+                to="/documents"
+                className="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold transition-all border border-white/30 flex items-center gap-2 shadow-xs cursor-pointer backdrop-blur-xs hover:border-white/50"
+              >
+                <FileText className="w-4 h-4 text-blue-100" />
+                <span>Sổ Văn bản đến</span>
+              </Link>
+              <Link
+                to="/tasks"
+                className="px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-800 rounded-xl text-xs font-black transition-all shadow-md shadow-black/10 flex items-center gap-2 cursor-pointer border border-white/80 active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4 text-blue-700" />
+                <span>Nhiệm vụ đôn đốc</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -317,21 +321,76 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-blue-600/50 text-blue-200 rounded-md">
-                AI Chief of Staff
+                Trợ lý Tham mưu Cấp ủy
               </span>
               <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                Đã chuyển sang phân hệ độc lập cao cấp
+                Đồng bộ 100% Google Drive & Máy học
               </span>
             </div>
             <h2 className="text-base font-black text-white uppercase tracking-wide mt-0.5">
-              Trung tâm Trợ lý Ảo Chánh Văn phòng (Mở giao diện đầy đủ)
+              Trung tâm Trợ lý Tham mưu Cấp ủy (Mở giao diện đầy đủ)
             </h2>
-            <p className="text-xs text-blue-200/80">Nhấn vào đây để truy cập không gian tham mưu chuyên sâu, báo cáo điều hành AI và quản lý điểm nóng</p>
+            <p className="text-xs text-blue-200/80">Nhấn vào đây để truy cập không gian tham mưu chuyên sâu, báo cáo điều hành AI và dự thảo kết luận</p>
           </div>
         </div>
         <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center group-hover:translate-x-1 transition-transform flex-shrink-0 shadow-md">
           <ChevronRight className="w-5 h-5" />
+        </div>
+      </div>
+
+      {/* DAILY SCENARIO LEARNING & GOOGLE MAPS REVIEW WIDGET */}
+      <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 rounded-3xl p-6 border border-amber-200 shadow-sm relative overflow-hidden">
+        <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-amber-200/60">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md">
+              <Award className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-md uppercase">
+                  Tình huống Tham mưu Hôm nay
+                </span>
+                <span className="text-[11px] font-bold text-amber-900">
+                  Google Maps Style AI Training
+                </span>
+              </div>
+              <h3 className="text-base font-black text-slate-900 mt-0.5">
+                Rèn Luyện Não AI: {DAILY_SCENARIOS_BANK[0].title}
+              </h3>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate('/ai-assistant')}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black inline-flex items-center gap-2 shadow-md transition-all cursor-pointer hover:scale-102"
+          >
+            <Star className="w-4 h-4 fill-white" />
+            <span>Đánh Giá & Luyện Não AI (+25 Điểm)</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="pt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+          <div className="md:col-span-8 text-xs text-slate-700 font-medium leading-relaxed">
+            <p className="line-clamp-2">
+              <strong>Bối cảnh:</strong> {DAILY_SCENARIOS_BANK[0].background}
+            </p>
+            <p className="text-[11px] text-blue-900 font-bold mt-1">
+              🎯 Thẩm quyền: {DAILY_SCENARIOS_BANK[0].defaultAiAdvice.authority}
+            </p>
+          </div>
+
+          <div className="md:col-span-4 bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-amber-200/80 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-bold text-slate-500 uppercase">Huy hiệu Chuyên gia</div>
+              <div className="text-xs font-black text-amber-950">Cấp 3: Cán bộ Nòng cốt</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-black text-emerald-600">98.5%</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">Độ chuẩn xác AI</div>
+            </div>
+          </div>
         </div>
       </div>
 

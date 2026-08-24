@@ -30,8 +30,14 @@ export const CONNECTED_APP_URL = "https://ai.studio/apps/000a18f3-b782-4432-ad25
 export const CONNECTED_APP_NAME = "Hệ thống Trợ lý Tham mưu & Cơ sở Dữ liệu Trung tâm";
 
 // Target Google Drive Folder configuration
-export const TARGET_DRIVE_FOLDER_ID = "1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY";
-export const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1XqI-PetoZDvUiGEDiqnT25-4t1qonbIY";
+export const TARGET_DRIVE_FOLDER_ID = "1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR";
+export const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR";
+
+// Target Google Docs Official Benchmark Sample Template
+export const SAMPLE_CONCLUSION_DOC_ID = "1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ";
+export const SAMPLE_CONCLUSION_DOC_URL = "https://docs.google.com/document/d/1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ/edit?tab=t.0";
+export const SAMPLE_CONCLUSION_DOC_PREVIEW_URL = "https://docs.google.com/document/d/1uzKq-XB69np2ElcHje3qznYco_uxWc1PHCv-cKUgfUQ/preview";
+
 
 // Token management with session persistence
 let cachedAccessToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem('gdrive_access_token') : null;
