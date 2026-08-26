@@ -15,7 +15,7 @@ import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, 
 import { 
   db, collection, getDocs, doc, setDoc, deleteDoc, writeBatch, serverTimestamp,
   query, orderBy, limit,
-  TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess,
+  TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess, setCachedAccessToken,
   CONNECTED_APP_ID, CONNECTED_APP_URL, CONNECTED_APP_NAME
 } from '../lib/firebase';
 import { safeFetchJson } from '../lib/safeFetch';
@@ -845,7 +845,7 @@ export default function Admin() {
         return;
       }
 
-      const res = await safeFetchJson('/api/drive/export-brain', {
+      let res = await safeFetchJson('/api/drive/export-brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -861,6 +861,30 @@ export default function Admin() {
           }
         })
       });
+
+      if (res.status === 401 || res.data?.isAuthError) {
+        console.warn("[Drive] Export brain returned 401/authError. Clearing cached token and re-requesting access...");
+        setCachedAccessToken(null);
+        token = await requestDriveAccess();
+        if (token) {
+          res = await safeFetchJson('/api/drive/export-brain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceToken: token,
+              folderId: TARGET_DRIVE_FOLDER_ID,
+              learnedRules,
+              departments,
+              routingRules,
+              legalBases: legalBasis,
+              styleMemory: {
+                preferredStyles: ['Quyết liệt', 'Dân vận khéo'],
+                frequentSigners: ['Bí thư Đảng ủy', 'Chánh Văn phòng']
+              }
+            })
+          });
+        }
+      }
 
       if (res.ok && res.data?.success) {
         const data = res.data;
@@ -900,7 +924,7 @@ export default function Admin() {
         return;
       }
 
-      const res = await safeFetchJson('/api/drive/import-brain', {
+      let res = await safeFetchJson('/api/drive/import-brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -908,6 +932,22 @@ export default function Admin() {
           folderId: TARGET_DRIVE_FOLDER_ID
         })
       });
+
+      if (res.status === 401 || res.data?.isAuthError) {
+        console.warn("[Drive] Import brain returned 401/authError. Clearing cached token and re-requesting access...");
+        setCachedAccessToken(null);
+        token = await requestDriveAccess();
+        if (token) {
+          res = await safeFetchJson('/api/drive/import-brain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceToken: token,
+              folderId: TARGET_DRIVE_FOLDER_ID
+            })
+          });
+        }
+      }
 
       if (res.ok && res.data?.success && res.data?.brainData) {
         const brain = res.data.brainData;

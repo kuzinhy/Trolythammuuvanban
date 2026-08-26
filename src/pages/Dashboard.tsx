@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, getAccessToken, requestDriveAccess } from '../lib/firebase';
+import { db, getAccessToken, requestDriveAccess, setCachedAccessToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useWardStore } from '../store/wardStore';
 import { Document, Task } from '../types';
@@ -181,6 +181,11 @@ export default function Dashboard() {
         throw new Error(uploadRes.error || 'Tải lên và phân tích văn bản thất bại');
       }
       const data = uploadRes.data;
+
+      if (data.isDriveAuthError) {
+        console.warn("[Drive] Drive token invalid or expired. Clearing cached token.");
+        setCachedAccessToken(null);
+      }
 
       setUploadStep('Đang lưu trữ hồ sơ dịch vụ công...');
 

@@ -114,6 +114,26 @@ function cleanJsonText(raw: string): string {
   return cleaned;
 }
 
+// Helper to format Google Drive API error responses cleanly into human readable messages
+function formatGoogleDriveError(status: number, errText: string): string {
+  if (status === 401 || errText.includes('authError') || errText.includes('Invalid Credentials') || errText.includes('UNAUTHENTICATED') || errText.includes('invalid authentication credentials')) {
+    return 'Phiên làm việc Google Drive đã hết hạn hoặc chưa được cấp quyền (401 AuthError). Vui lòng kết nối lại tài khoản Google Drive.';
+  }
+  if (status === 403 || errText.includes('insufficientPermissions')) {
+    return 'Tài khoản chưa được cấp quyền truy cập hoặc ghi vào thư mục Google Drive này (403 Forbidden).';
+  }
+  if (status === 404) {
+    return 'Không tìm thấy thư mục hoặc tệp tin trên Google Drive (404 Not Found).';
+  }
+  try {
+    const parsed = JSON.parse(errText);
+    if (parsed?.error?.message) {
+      return `Lỗi Google Drive (${status}): ${parsed.error.message}`;
+    }
+  } catch (_) {}
+  return `Lỗi Google Drive (${status}): ${errText.slice(0, 150)}`;
+}
+
 // Helper to upload a buffer to Google Drive with automatic folder fallback
 async function uploadBufferToGoogleDrive(params: {
   fileBuffer: Buffer;
@@ -154,45 +174,58 @@ async function uploadBufferToGoogleDrive(params: {
       body: bodyBuffer,
     });
 
-    // If upload into target folder failed (e.g. lack of permissions on that specific folder), retry directly to root Drive
+    // If upload into target folder failed due to non-auth reasons (e.g. folder 404/403), retry directly to root Drive
     if (!driveRes.ok && targetFolderId) {
       const errText = await driveRes.text();
-      console.warn(`[Drive] Upload to folder ${targetFolderId} returned ${driveRes.status}: ${errText}. Retrying directly to user's root Drive...`);
+      const isAuthErr = driveRes.status === 401 || errText.includes('authError') || errText.includes('Invalid Credentials');
       
-      const fallbackMetadata = { name: fileName };
-      const fallbackBuffer = Buffer.concat([
-        Buffer.from(
-          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(fallbackMetadata)}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
-        ),
-        fileBuffer,
-        Buffer.from(closeDelimiter),
-      ]);
+      if (!isAuthErr) {
+        console.warn(`[Drive] Upload to folder ${targetFolderId} returned ${driveRes.status}. Retrying directly to user's root Drive...`);
+        
+        const fallbackMetadata = { name: fileName };
+        const fallbackBuffer = Buffer.concat([
+          Buffer.from(
+            `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(fallbackMetadata)}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
+          ),
+          fileBuffer,
+          Buffer.from(closeDelimiter),
+        ]);
 
-      driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-        },
-        body: fallbackBuffer,
-      });
+        driveRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`,
+          },
+          body: fallbackBuffer,
+        });
+      } else {
+        // Store formatted auth error directly
+        driveError = formatGoogleDriveError(driveRes.status, errText);
+      }
     }
 
-    if (driveRes.ok) {
+    if (!driveRes.ok) {
+      if (!driveError) {
+        try {
+          const errText = await driveRes.text();
+          driveError = formatGoogleDriveError(driveRes.status, errText);
+        } catch (_) {
+          driveError = formatGoogleDriveError(driveRes.status, '');
+        }
+      }
+      console.warn(`[Drive] Drive upload failed (${driveRes.status}):`, driveError);
+    } else {
       const driveData = await driveRes.json() as any;
       driveFileId = driveData.id;
       driveUrl = driveData.webViewLink || `https://drive.google.com/file/d/${driveFileId}/view`;
       driveFolderId = targetFolderId || null;
       driveFolderUrl = targetFolderId ? `https://drive.google.com/drive/folders/${targetFolderId}` : null;
       console.log(`[Drive] File uploaded successfully to Google Drive: ${driveFileId} (${driveUrl})`);
-    } else {
-      const errText = await driveRes.text();
-      driveError = errText;
-      console.warn('[Drive] Drive upload failed:', driveRes.status, errText);
     }
   } catch (err: any) {
     driveError = err?.message || String(err);
-    console.warn('[Drive] Drive upload exception:', err);
+    console.warn('[Drive] Drive upload exception:', driveError);
   }
 
   return { driveFileId, driveUrl, driveFolderId, driveFolderUrl, driveError };
@@ -412,6 +445,13 @@ Quy tắc tham mưu phân luồng hành chính chung:
       tmpFilePath = null;
     }
 
+    const isDriveAuthError = !!(driveResult.driveError && (
+      driveResult.driveError.includes('401') ||
+      driveResult.driveError.includes('authError') ||
+      driveResult.driveError.includes('hết hạn') ||
+      driveResult.driveError.includes('UNAUTHENTICATED')
+    ));
+
     res.json({
       success: true,
       analysis: extractedData,
@@ -420,6 +460,7 @@ Quy tắc tham mưu phân luồng hành chính chung:
       driveFolderId: driveResult.driveFolderId,
       driveFolderUrl: driveResult.driveFolderUrl,
       driveError: driveResult.driveError,
+      isDriveAuthError,
       fileName: file.originalname,
       mimeType: mimeType
     });

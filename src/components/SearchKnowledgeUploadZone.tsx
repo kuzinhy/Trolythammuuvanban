@@ -6,7 +6,7 @@ import {
   ShieldCheck, ArrowRight, FolderPlus
 } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, getAccessToken } from '../lib/firebase';
+import { db, getAccessToken, setCachedAccessToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { Document } from '../types';
 import { safeFetchJson } from '../lib/safeFetch';
@@ -77,6 +77,11 @@ export default function SearchKnowledgeUploadZone({ onDocumentAdded, referenceDo
         throw new Error(uploadRes.error || 'Trích xuất và lập chỉ mục văn bản thất bại.');
       }
       const data = uploadRes.data;
+
+      if (data.isDriveAuthError) {
+        console.warn("[Drive] Drive token invalid or expired. Clearing cached token.");
+        setCachedAccessToken(null);
+      }
 
       setUploadStep('Đang lưu vào Kho cơ sở tri thức tra cứu...');
 
