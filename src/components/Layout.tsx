@@ -1,28 +1,35 @@
 import { useState, useEffect, useMemo } from "react";
 import { Outlet, NavLink, useLocation, Link, useNavigate } from "react-router";
 import { logout, db } from "../lib/firebase";
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, limit, updateDoc, doc } from 'firebase/firestore';
 import { useAuthStore, isSystemAdmin } from "../store/authStore";
 import { Document, Task } from "../types";
-import { getDocumentProgressStatus, isUrgentDocument } from "../lib/documentUtils";
+import { getDocumentProgressStatus, isUrgentDocument, isDocumentCompleted } from "../lib/documentUtils";
 import { TaskReminderToasts } from "./TaskReminderToasts";
 import { 
   FileText, LayoutDashboard, CheckSquare, LogOut, Search, 
   Sparkles, Building2, ChevronRight, HardDrive, ExternalLink, 
-  ShieldAlert, Settings, Layers, ShieldCheck, MapPin, BarChart3,
-  Bell, BellRing, X, ArrowRight, AlertTriangle, CheckCircle2, FileSearch, Bot
+  ShieldAlert, Settings, Layers, ShieldCheck, MapPin, BarChart3, Calendar,
+  Bell, BellRing, X, ArrowRight, AlertTriangle, CheckCircle2, FileSearch, Bot,
+  User, Sliders, ChevronDown
 } from "lucide-react";
 import AIAssistant from "./AIAssistant";
+import UserAdminMenu from "./UserAdminMenu";
+import WardSwitcher from "./WardSwitcher";
+import { useWardStore } from "../store/wardStore";
 import { cn } from "../lib/utils";
 
 const TARGET_DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR";
 
 export default function Layout() {
   const { user, setUser, logout: authStoreLogout } = useAuthStore();
+  const { getActiveWard } = useWardStore();
+  const activeWard = getActiveWard();
   const location = useLocation();
   const navigate = useNavigate();
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [showNotifPopover, setShowNotifPopover] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -64,9 +71,39 @@ export default function Layout() {
     };
   }, []);
 
-  // Compute urgent, overdue, and due soon documents
+  // Keyboard shortcut listener (Ctrl+K -> Search, Ctrl+Shift+A -> AI Assistant)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        navigate('/search');
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsAIOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
+
+  const handleMarkAsProcessed = async (e: React.MouseEvent, docId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await updateDoc(doc(db, 'documents', docId), {
+        processingResult: 'COMPLETED',
+        status: 'COMPLETED',
+        isProcessed: true
+      });
+    } catch (err) {
+      console.error("Lỗi khi đánh dấu văn bản đã xử lý:", err);
+    }
+  };
+
+  // Compute urgent, overdue, and due soon documents (excluding completed ones)
   const urgentAndOverdueDocs = useMemo(() => {
     return documents.filter(doc => {
+      if (isDocumentCompleted(doc)) return false; // Turned off notification when processed
       const status = getDocumentProgressStatus(doc);
       const urgent = isUrgentDocument(doc);
       return urgent || status.type === 'OVERDUE' || status.type === 'DUE_TODAY' || status.type === 'DUE_SOON';
@@ -82,14 +119,16 @@ export default function Layout() {
   }, [documents]);
 
   const urgentCount = urgentAndOverdueDocs.length;
-  const overdueCount = useMemo(() => documents.filter(d => getDocumentProgressStatus(d).type === 'OVERDUE').length, [documents]);
-  const hienKhanCount = useMemo(() => documents.filter(d => isUrgentDocument(d)).length, [documents]);
+  const overdueCount = useMemo(() => documents.filter(d => !isDocumentCompleted(d) && getDocumentProgressStatus(d).type === 'OVERDUE').length, [documents]);
+  const hienKhanCount = useMemo(() => documents.filter(d => !isDocumentCompleted(d) && isUrgentDocument(d)).length, [documents]);
 
   const getPageTitle = () => {
     switch (location.pathname) {
       case '/': return 'Bàn làm việc & Tham mưu Văn bản';
       case '/documents': return 'Sổ Đăng ký & Quản lý Văn bản';
-      case '/tasks': return 'Theo dõi & Đôn đốc Nhiệm vụ';
+      case '/tasks': return 'Theo dõi, Thống kê & Đôn đốc Nhiệm vụ';
+      case '/schedule': return 'Lịch Công Tác Lãnh Đạo & Cơ Quan';
+      case '/statistics': return 'Theo dõi, Thống kê & Đôn đốc Nhiệm vụ';
       case '/ai-assistant': return 'Trợ lý Tham mưu';
       case '/search': return 'Tra cứu & Thống kê Văn bản';
       case '/map': return 'Bản đồ số Địa bàn & Điểm nóng Giám sát';
@@ -112,9 +151,13 @@ export default function Layout() {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-600/30 ring-2 ring-blue-500/20">
               <Building2 className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <h1 className="text-xs font-black uppercase tracking-wider text-blue-950">ĐẢNG ỦY PHƯỜNG</h1>
-              <p className="text-[10px] text-blue-600 font-bold tracking-tight">Cổng Điều hành Điện tử Tech</p>
+            <div className="min-w-0">
+              <h1 className="text-xs font-black uppercase tracking-wider text-blue-950 truncate">
+                {activeWard?.shortName || 'ĐẢNG ỦY PHƯỜNG'}
+              </h1>
+              <p className="text-[10px] text-blue-600 font-bold tracking-tight truncate">
+                {activeWard?.parentOrg || 'Cổng Điều hành Cấp ủy'}
+              </p>
             </div>
           </div>
         </div>
@@ -171,7 +214,27 @@ export default function Layout() {
               )}
             >
               <CheckSquare className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span className="truncate">Nhiệm vụ đôn đốc</span>
+              <span className="truncate">Nhiệm vụ & Đôn đốc</span>
+            </NavLink>
+          </div>
+
+          {/* Group 2: Work Schedule */}
+          <div className="space-y-1 pt-2 border-t border-slate-100">
+            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Lịch công tác</span>
+            </div>
+
+            <NavLink
+              to="/schedule"
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
+                isActive
+                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
+                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+              )}
+            >
+              <Calendar className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="truncate">Lịch công tác tuần</span>
             </NavLink>
           </div>
 
@@ -234,79 +297,7 @@ export default function Layout() {
               <span className="truncate">Bản đồ Địa bàn</span>
             </NavLink>
           </div>
-
-          {/* Group 3: Search & Knowledge Base */}
-          <div className="space-y-1 pt-2 border-t border-slate-100">
-            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Tra cứu & Kho Tri thức</span>
-            </div>
-
-            <NavLink
-              to="/search"
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
-                isActive
-                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/30"
-                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-              )}
-            >
-              <Search className="w-4 h-4 flex-shrink-0 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span className="truncate">Tra cứu & Kho Văn bản</span>
-            </NavLink>
-          </div>
-
-          {/* Group 4: System Administration & Storage */}
-          <div className="space-y-1 pt-2 border-t border-slate-100">
-            <div className="px-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-              <span>Hệ thống</span>
-              {isAdmin && <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded text-[9px] font-black">ADMIN</span>}
-            </div>
-
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => cn(
-                "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
-                isActive
-                  ? "bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/25"
-                  : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
-              )}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <ShieldAlert className="w-4 h-4 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="truncate">Bộ Não AI & Quản trị</span>
-              </div>
-              {isAdmin && (
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping flex-shrink-0"></span>
-              )}
-            </NavLink>
-          </div>
         </nav>
-
-        {/* User profile footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-200 flex items-center justify-center text-xs font-bold text-white uppercase shadow-sm">
-              {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'A'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1.5">
-                <span>{user?.displayName || user?.email?.split('@')[0]}</span>
-                {isAdmin && (
-                  <span className="px-1.5 py-0.5 bg-blue-600 text-white text-[9px] font-black rounded-md">AD</span>
-                )}
-              </div>
-              <div className="text-[10px] text-slate-500 truncate">{user?.email}</div>
-            </div>
-            <button 
-              onClick={handleLogout} 
-              disabled={isLoggingOut}
-              className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
-              title="Đăng xuất khỏi hệ thống"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -345,10 +336,13 @@ export default function Layout() {
 
           {/* Center / Right Header Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Multi-Ward / Administrative Unit Switcher */}
+            <WardSwitcher />
+
             {/* Quick Search Trigger Bar */}
             <Link
               to="/search"
-              className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/70 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-medium transition-colors w-52"
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/70 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-medium transition-colors w-48 xl:w-52"
             >
               <Search className="w-3.5 h-3.5 text-slate-400" />
               <span className="truncate">Tra cứu văn bản...</span>
@@ -427,9 +421,20 @@ export default function Layout() {
 
                             <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 font-medium">
                               <span>Cơ quan: {doc.issuer || 'N/A'}</span>
-                              <span className="text-blue-600 font-bold flex items-center gap-0.5">
-                                Xử lý ngay <ArrowRight className="w-2.5 h-2.5" />
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleMarkAsProcessed(e, doc.id)}
+                                  className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                  title="Đánh dấu đã xử lý xong để tắt thông báo văn bản này"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  <span>Đã xử lý</span>
+                                </button>
+                                <span className="text-blue-600 font-bold flex items-center gap-0.5">
+                                  Xử lý ngay <ArrowRight className="w-2.5 h-2.5" />
+                                </span>
+                              </div>
                             </div>
                           </Link>
                         );
@@ -472,6 +477,37 @@ export default function Layout() {
               <span>Google Drive</span>
               <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </a>
+
+            {/* User Profile & Admin Menu Trigger Button */}
+            <button
+              onClick={() => setShowUserMenu(prev => !prev)}
+              className={cn(
+                "flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl border transition-all cursor-pointer group shadow-2xs",
+                showUserMenu
+                  ? "bg-blue-50 border-blue-300 ring-2 ring-blue-500/20 text-blue-900"
+                  : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+              )}
+              title="Mở Menu Người dùng & Quản trị Cấp ủy"
+            >
+              <div className="relative">
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-300 flex items-center justify-center text-[11px] font-black text-white uppercase shadow-xs">
+                  {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'A'}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-white rounded-full" />
+              </div>
+
+              <div className="hidden sm:flex flex-col items-start text-left">
+                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 leading-tight">
+                  <span className="truncate max-w-[110px]">{user?.displayName || user?.email?.split('@')[0]}</span>
+                  {isAdmin && (
+                    <span className="px-1 py-0.2 bg-blue-600 text-white text-[8px] font-black rounded">AD</span>
+                  )}
+                </div>
+                <span className="text-[9px] text-blue-600 font-extrabold tracking-tight">Menu Quản trị</span>
+              </div>
+
+              <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-200", showUserMenu && "rotate-180 text-blue-600")} />
+            </button>
           </div>
         </header>
 
@@ -480,6 +516,16 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Dedicated User & Admin Control Menu Dropdown */}
+      <UserAdminMenu
+        isOpen={showUserMenu}
+        onClose={() => setShowUserMenu(false)}
+        user={user}
+        handleLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
+        isAdmin={isAdmin}
+      />
       
       {/* On-Demand AI Assistant Drawer */}
       <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />

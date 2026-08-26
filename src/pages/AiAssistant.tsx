@@ -3,11 +3,13 @@ import {
   Sparkles, Bot, Send, ShieldAlert, CheckCircle2, FileText, Clock, 
   ChevronRight, ArrowRight, RefreshCw, AlertTriangle, 
   CheckSquare, Users, Building2, Play, Pause, Volume2, ShieldCheck, Link2,
-  Calendar, Eye, Copy, Check, RotateCcw, Download, Brain
+  Calendar, Eye, Copy, Check, RotateCcw, Download, Brain, Sliders
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { db, collection, getDocs, query, orderBy, limit } from '../lib/firebase';
 import { getActiveLearningRules, LearningRule } from '../lib/learningEngine';
+import { useUserInteractionStore } from '../store/userInteractionStore';
+import { InteractionMemoryPanel } from '../components/InteractionMemoryPanel';
 import { CrossAppInteroperabilityCenter } from '../components/CrossAppInteroperabilityCenter';
 import { WeeklyScheduleGenerator } from '../components/WeeklyScheduleGenerator';
 import { MeetingNoticeGenerator } from '../components/MeetingNoticeGenerator';
@@ -20,9 +22,11 @@ export default function AiAssistant() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'finetune' | 'training' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage'>('briefing');
+  const [activeTab, setActiveTab] = useState<'briefing' | 'advisor' | 'finetune' | 'training' | 'schedule' | 'notice' | 'multimodal' | 'interop' | 'triage' | 'memory'>('briefing');
   const [selectedRole, setSelectedRole] = useState<'GENERAL' | 'ROUTING_AUTHORITY' | 'DIRECTIVE_DRAFTING' | 'LEGAL_AUDIT'>('GENERAL');
   const [selectedDocId, setSelectedDocId] = useState<string>('ALL');
+
+  const { preferences, getFormattedPromptContext, addInteractionRecord } = useUserInteractionStore();
   
   const [chatQuery, setChatQuery] = useState('');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -97,7 +101,8 @@ export default function AiAssistant() {
         body: JSON.stringify({
           message: `Dựa trên dữ liệu Văn phòng Đảng ủy: ${JSON.stringify(summaryPayload)}. Hãy đóng vai Trợ lý Chánh Văn phòng cấp cao, soạn một "Báo cáo điều hành nhanh buổi sáng" chuẩn mực, sắc sảo dành riêng cho Chánh Văn phòng Đảng ủy, gồm: 1. Đánh giá tình hình văn bản đến & nhiệm vụ; 2. Các điểm nóng cần Thường trực Ban Thường vụ cho ý kiến ngay; 3. Đề xuất phương án phân luồng & đôn đốc cụ thể. Viết bằng văn phong hành chính đảng sắc bén, ngắn gọn, chuyên nghiệp.`,
           learnedRules: learnedRules.slice(0, 15),
-          trainingDatasets: trainingDatasets.slice(0, 10)
+          trainingDatasets: trainingDatasets.slice(0, 10),
+          userPreferencesContext: getFormattedPromptContext()
         })
       });
 
@@ -143,12 +148,21 @@ export default function AiAssistant() {
           contextDocument: targetDoc,
           roleContext: selectedRole,
           learnedRules: learnedRules.slice(0, 15),
-          trainingDatasets: trainingDatasets.slice(0, 10)
+          trainingDatasets: trainingDatasets.slice(0, 10),
+          userPreferencesContext: getFormattedPromptContext()
         })
       });
 
       const data = await res.json();
       setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply || 'Xin lỗi đồng chí, tôi chưa thể tổng hợp ngay lúc này.' }]);
+
+      addInteractionRecord({
+        promptSummary: queryText.slice(0, 120),
+        selectedRole: preferences.preferredStyle,
+        styleUsed: preferences.documentTone,
+        legalBasisIncluded: preferences.includeLegalBasis,
+        userFeedback: null
+      });
     } catch (e) {
       console.error("Chat error:", e);
       setChatHistory(prev => [...prev, { role: 'assistant', content: 'Đã xảy ra lỗi kết nối khi phân tích dữ liệu.' }]);
@@ -274,6 +288,18 @@ export default function AiAssistant() {
         >
           <Bot className="w-4 h-4" />
           <span>Hỏi đáp Tham mưu Chuyên sâu</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('memory')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'memory' 
+              ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-sky-700 text-white shadow-md shadow-blue-500/30 scale-[1.02]' 
+              : 'text-blue-900 bg-blue-50/80 hover:bg-blue-100/90 border border-blue-200/90'
+          }`}
+        >
+          <Sliders className="w-4 h-4 text-cyan-300 animate-pulse" />
+          <span>🧠 Bộ Nhớ & Tùy Chọn Định Dạng</span>
         </button>
 
         <button
@@ -650,6 +676,11 @@ export default function AiAssistant() {
             </button>
           </form>
         </div>
+      )}
+
+      {/* TAB: MEMORY & FORMATTING PREFERENCES */}
+      {activeTab === 'memory' && (
+        <InteractionMemoryPanel />
       )}
 
       {/* TAB: FINE-TUNING & ASSISTANT TRAINER STUDIO */}

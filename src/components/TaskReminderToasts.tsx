@@ -58,6 +58,11 @@ export function parseDateString(dateStr: string | null | undefined): Date | null
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// Unique session page ID generated on initial script/page load (resets on F5 refresh)
+const PAGE_INSTANCE_ID = typeof window !== 'undefined' 
+  ? ((window as any).__PAGE_LOAD_ID__ = (window as any).__PAGE_LOAD_ID__ || Date.now().toString()) 
+  : '';
+
 export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskReminderToastsProps) {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [filterUrgency, setFilterUrgency] = useState<'ALL' | 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON'>('ALL');
@@ -65,10 +70,25 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [toastFeedback, setToastFeedback] = useState<string | null>(null);
+
+  // Track if reminder was dismissed during this page session (persists across SPA menu navigation, resets on F5 refresh)
+  const [isSessionDismissed, setIsSessionDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const storedPageId = sessionStorage.getItem('deadline_toast_dismissed_page');
+    return storedPageId === PAGE_INSTANCE_ID;
+  });
+
   const navigate = useNavigate();
 
   const prevTasksCountRef = useRef(tasks.length);
   const isFirstRender = useRef(true);
+
+  const dismissForSession = () => {
+    setIsSessionDismissed(true);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('deadline_toast_dismissed_page', PAGE_INSTANCE_ID);
+    }
+  };
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -213,6 +233,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
   const handleDismissAll = () => {
     const allIds = new Set(activeReminders.map(r => r.id));
     setDismissedIds(allIds);
+    dismissForSession();
   };
 
   const handleQuickCompleteTask = async (item: ReminderItem) => {
@@ -241,7 +262,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
     }
   };
 
-  if (activeReminders.length === 0 && !toastFeedback) {
+  if ((activeReminders.length === 0 || isSessionDismissed) && !toastFeedback) {
     return null;
   }
 
@@ -263,6 +284,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
       </AnimatePresence>
 
       {/* Modern Flat Floating Toast Reminders Widget */}
+      {!isSessionDismissed && activeReminders.length > 0 && (
       <div className="fixed bottom-5 right-5 z-40 max-w-sm w-full px-2 sm:px-0 pointer-events-none">
         <div className="pointer-events-auto space-y-3">
           <motion.div
@@ -302,17 +324,12 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
 
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  className="px-2 py-1 text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-200/60 transition-colors text-xs font-medium"
+                  onClick={dismissForSession}
+                  className="px-2 py-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-md transition-colors text-[11px] font-bold flex items-center gap-1"
+                  title="Tắt nhắc nhở này (chỉ nhắc lại khi F5 web)"
                 >
-                  {isMinimized ? "Hiện" : "Ẩn"}
-                </button>
-                <button
-                  onClick={handleDismissAll}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200/60 transition-colors"
-                  title="Đóng tất cả"
-                >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
+                  <span>Đóng</span>
                 </button>
               </div>
             </div>
@@ -473,6 +490,7 @@ export function TaskReminderToasts({ tasks, documents = [], onRefresh }: TaskRem
           </motion.div>
         </div>
       </div>
+      )}
     </>
   );
 }

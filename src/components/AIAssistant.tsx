@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { getActiveLearningRules, LearningRule } from '../lib/learningEngine';
+import { useUserInteractionStore } from '../store/userInteractionStore';
+import { InteractionMemoryPanel } from './InteractionMemoryPanel';
 import { 
   X, Send, FileText, Sparkles, ShieldCheck, Scale, CheckCircle2, 
   Copy, Check, RotateCcw, AlertCircle, Download, 
-  ChevronDown, Layers, PenTool, Database, MessageSquareQuote, Brain
+  ChevronDown, Layers, PenTool, Database, MessageSquareQuote, Brain, Sliders
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
@@ -63,6 +65,9 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
   const [selectedDocId, setSelectedDocId] = useState<string>(contextDocument?.id || 'ALL');
   const [selectedRole, setSelectedRole] = useState<AdvisorRole>('CHIEF_OF_STAFF');
   const [showDocSelector, setShowDocSelector] = useState(false);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+
+  const { preferences, getFormattedPromptContext, addInteractionRecord } = useUserInteractionStore();
 
   useEffect(() => {
     if (contextDocument?.id) {
@@ -168,6 +173,7 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
           contextDocs: recentDocs.slice(0, 10),
           learnedRules: learnedRules.slice(0, 15),
           trainingDatasets: trainingDatasets.slice(0, 10),
+          userPreferencesContext: getFormattedPromptContext()
         })
       });
       
@@ -177,6 +183,15 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
       }
       
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'Tôi đã tiếp nhận yêu cầu.' }]);
+
+      // Record in Zustand memory store
+      addInteractionRecord({
+        promptSummary: userMessage.slice(0, 120),
+        selectedRole: preferences.preferredStyle,
+        styleUsed: preferences.documentTone,
+        legalBasisIncluded: preferences.includeLegalBasis,
+        userFeedback: null
+      });
     } catch (e: any) {
       console.error('AIAssistant send error:', e);
       setMessages(prev => [
@@ -233,6 +248,18 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowMemoryPanel(!showMemoryPanel)}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-xs font-bold ${
+                showMemoryPanel
+                  ? 'bg-amber-400 text-slate-950 shadow-sm'
+                  : 'text-blue-100 hover:text-white hover:bg-white/15'
+              }`}
+              title="Tùy chọn phong cách văn phong & Bộ nhớ tương tác Zustand"
+            >
+              <Brain className="w-4 h-4 text-cyan-200" />
+              <span className="hidden sm:inline">Bộ Nhớ AI</span>
+            </button>
             <button 
               onClick={handleExportChat}
               className="p-1.5 rounded-lg text-blue-100 hover:text-white hover:bg-white/15 transition-colors cursor-pointer"
@@ -335,9 +362,15 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
           </div>
         </div>
 
-        {/* Message Conversation Stream */}
+        {/* Message Conversation Stream or Memory Panel */}
         <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 bg-slate-50/70">
-          {messages.map((msg, idx) => (
+          {showMemoryPanel ? (
+            <div className="animate-fade-in">
+              <InteractionMemoryPanel />
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, idx) => (
             <div key={idx} className={cn("flex gap-3 items-start", msg.role === 'user' ? "flex-row-reverse" : "")}>
               {msg.role === 'assistant' && (
                 <div className={cn(
@@ -447,6 +480,8 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
           )}
           
           <div ref={messagesEndRef} />
+            </>
+          )}
         </div>
 
         {/* Input Bar */}

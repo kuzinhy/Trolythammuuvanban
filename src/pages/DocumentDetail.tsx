@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { doc, getDoc, collection, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db, getAccessToken, requestDriveAccess } from '../lib/firebase';
+import { db, getAccessToken, requestDriveAccess, setCachedAccessToken } from '../lib/firebase';
 import { 
   FileText, Loader2, Sparkles, Check, CheckSquare, Printer, 
   ArrowLeft, Clock, ShieldCheck, Building2, Edit3, Save, RotateCcw, BrainCircuit,
@@ -10,7 +10,7 @@ import {
 import { Document, Task } from '../types';
 import DispatchSlip from '../components/DispatchSlip';
 import DraftGenerator from '../components/DraftGenerator';
-import { getDocumentProgressStatus } from '../lib/documentUtils';
+import { getDocumentProgressStatus, isDocumentCompleted } from '../lib/documentUtils';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 import { getActiveLearningRules, saveLearnedAdjustmentRule, matchTextAgainstLearnedRules, type LearningRule } from '../lib/learningEngine';
 
@@ -227,15 +227,27 @@ export default function DocumentDetail() {
         return;
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('workspaceToken', token);
+      const uploadFile = async (authToken: string) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('workspaceToken', authToken);
+        return fetch('/api/drive/sync-file', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${authToken}` },
+          body: formData,
+        });
+      };
 
-      const res = await fetch('/api/drive/sync-file', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
+      let res = await uploadFile(token);
+
+      if (res.status === 401) {
+        console.warn("[Drive] Received 401 unauthorized. Prompting user to refresh Google Drive token...");
+        setCachedAccessToken(null);
+        token = await requestDriveAccess();
+        if (token) {
+          res = await uploadFile(token);
+        }
+      }
 
       const data = await res.json();
       if (!res.ok) {
@@ -264,6 +276,31 @@ export default function DocumentDetail() {
       alert(err.message || 'Lỗi khi đồng bộ lên Google Drive');
     } finally {
       setIsSyncingDrive(false);
+    }
+  };
+
+  const handleToggleDocumentProcessed = async () => {
+    if (!id || !document) return;
+    const currentlyCompleted = isDocumentCompleted(document);
+    const newStatus = currentlyCompleted ? 'IN_PROGRESS' : 'COMPLETED';
+    const newProcResult = currentlyCompleted ? 'ĐANG THỰC HIỆN' : 'COMPLETED';
+
+    try {
+      await updateDoc(doc(db, 'documents', id), {
+        processingResult: newProcResult,
+        status: newStatus,
+        isProcessed: !currentlyCompleted,
+      });
+
+      setDocument(prev => prev ? {
+        ...prev,
+        processingResult: newProcResult,
+        status: newStatus as any,
+        isProcessed: !currentlyCompleted,
+      } : null);
+    } catch (err) {
+      console.error("Lỗi khi cập nhật trạng thái xử lý văn bản:", err);
+      alert("Lỗi khi cập nhật trạng thái xử lý văn bản.");
     }
   };
 
@@ -464,6 +501,19 @@ Nội dung chi tiết: ${document.fullContent || document.summary || ''}`;
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleToggleDocumentProcessed}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+              isDocumentCompleted(document)
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-400/30'
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+            }`}
+            title={isDocumentCompleted(document) ? "Văn bản đã xử lý xong. Bấm để khôi phục trạng thái chưa xong." : "Đánh dấu văn bản đã xử lý xong để tắt thông báo khẩn/quá hạn"}
+          >
+            <Check className="w-3.5 h-3.5 text-white" />
+            <span>{isDocumentCompleted(document) ? '✓ Đã Xử Lý Xong (Tắt Thông Báo)' : 'Đánh Dấu Đã Xử Lý'}</span>
+          </button>
+
           <button
             onClick={() => setShowDispatchSlip(true)}
             className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"

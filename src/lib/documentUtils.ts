@@ -171,10 +171,27 @@ export function matchDocumentType(doc: Partial<Document>, typeValue: string): bo
   );
 }
 
+export function isDocumentCompleted(docItem: Partial<Document>): boolean {
+  if (!docItem) return false;
+  const procResult = String(docItem.processingResult || '').toUpperCase();
+  const docStatus = String(docItem.status || '').toUpperCase();
+  return (
+    procResult === 'COMPLETED' || 
+    procResult === 'ĐÃ HOÀN THÀNH' || 
+    procResult === 'HOÀN THÀNH' || 
+    procResult === 'ĐÃ XỬ LÝ' ||
+    procResult === 'PROCESSED' ||
+    procResult === 'DISPATCHED' ||
+    docStatus === 'COMPLETED' ||
+    docStatus === 'PROCESSED' ||
+    docStatus === 'ĐÃ XỬ LÝ' ||
+    docStatus === 'DISPATCHED' ||
+    !!docItem.isProcessed
+  );
+}
+
 export function getDocumentProgressStatus(docItem: Partial<Document>): DocumentProgressStatus {
-  const procResult = (docItem.processingResult || '').toUpperCase();
-  const docStatus = (docItem.status || '').toUpperCase();
-  const isCompleted = procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || docStatus === 'COMPLETED';
+  const isCompleted = isDocumentCompleted(docItem);
 
   if (isCompleted) {
     return {
@@ -250,5 +267,6 @@ export function getDocumentProgressStatus(docItem: Partial<Document>): DocumentP
 }
 
 export function isUrgentDocument(doc: Partial<Document>): boolean {
+  if (isDocumentCompleted(doc)) return false;
   return !!(doc.urgency && doc.urgency !== 'Thường');
 }

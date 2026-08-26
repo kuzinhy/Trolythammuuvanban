@@ -6,14 +6,16 @@ import {
   Eye, Loader2, Search, Plus, Printer, ShieldAlert, 
   HardDrive, ExternalLink, Clock, AlertTriangle, CheckCircle2, Calendar, Tag,
   FileText, Check, X, ShieldCheck, Filter, Star, User, Download, BookOpen,
-  ChevronDown, ChevronUp, Layers, RefreshCw, Sparkles
+  ChevronDown, ChevronUp, Layers, RefreshCw, Sparkles, Building2
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router';
 import { useAuthStore } from '../store/authStore';
+import { useWardStore } from '../store/wardStore';
 import DispatchSlip from '../components/DispatchSlip';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 import { 
   getDocumentProgressStatus, 
+  isDocumentCompleted,
   parseDateString,
   ADMINISTRATIVE_DOC_TYPES,
   matchDocumentType,
@@ -26,6 +28,8 @@ export type ProgressFilter = 'ALL' | 'IMPORTANT' | 'MY_UPLOADS' | 'COMPLETED' | 
 
 export default function DocumentList() {
   const { user } = useAuthStore();
+  const { activeWardId, getActiveWard } = useWardStore();
+  const activeWard = getActiveWard();
   const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +194,11 @@ export default function DocumentList() {
   const filteredDocs = useMemo(() => {
     const term = debouncedSearch.toLowerCase().trim();
     return documents.filter(doc => {
+      // Multi-ward isolation filter
+      if (activeWardId !== 'all') {
+        if (doc.wardId && doc.wardId !== activeWardId) return false;
+      }
+
       const docTags = getDocumentTags(doc);
 
       if (selectedTagFilter !== 'ALL') {
@@ -231,14 +240,13 @@ export default function DocumentList() {
         return doc.createdBy === user.uid || (!!doc.uploadedByEmail && doc.uploadedByEmail === user.email);
       }
       if (filterType === 'COMPLETED') {
-        const procResult = (doc.processingResult || '').toUpperCase();
-        return procResult === 'COMPLETED' || procResult === 'ĐÃ HOÀN THÀNH' || procResult === 'HOÀN THÀNH' || (doc.status as string) === 'COMPLETED';
+        return isDocumentCompleted(doc);
       }
       if (filterType === 'OVERDUE') {
-        return status.type === 'OVERDUE';
+        return !isDocumentCompleted(doc) && status.type === 'OVERDUE';
       }
       if (filterType === 'DUE_TODAY') {
-        return status.type === 'DUE_TODAY';
+        return !isDocumentCompleted(doc) && status.type === 'DUE_TODAY';
       }
       if (filterType === 'IN_TIME') {
         return status.type === 'IN_TIME' || status.type === 'DUE_SOON';
@@ -247,7 +255,7 @@ export default function DocumentList() {
         return (doc.proposedAction || '').includes('Ban Thường vụ') || (doc.proposedAction || '').includes('Thường trực') || (doc.proposedAction || '').includes('Bí thư');
       }
       if (filterType === 'URGENT') {
-        return doc.urgency && doc.urgency !== 'Thường';
+        return !isDocumentCompleted(doc) && doc.urgency && doc.urgency !== 'Thường';
       }
       if (filterType === 'DRIVE') {
         return !!(doc.driveFileId || doc.driveUrl);
@@ -843,6 +851,12 @@ export default function DocumentList() {
                             {doc.uploadedByName}
                           </span>
                         )}
+                        {doc.wardName && activeWardId === 'all' && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-bold rounded">
+                            <Building2 className="w-2 h-2" />
+                            {doc.wardName.replace('Đảng ủy ', '')}
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -1064,7 +1078,9 @@ export default function DocumentList() {
             {/* Modal Content / Printable Table */}
             <div className="p-6 overflow-y-auto space-y-4 flex-1">
               <div className="text-center space-y-1 pb-3 border-b border-slate-200">
-                <div className="text-xs uppercase font-extrabold text-slate-500">ĐẢNG BỘ THÀNH PHỐ ĐÀ NẴNG - ĐẢNG ỦY PHƯỜNG</div>
+                <div className="text-xs uppercase font-extrabold text-slate-500">
+                  {activeWard?.parentOrg ? activeWard.parentOrg.toUpperCase() : 'THÀNH ỦY THỦ DẦU MỘT'} - {activeWard?.name ? activeWard.name.toUpperCase() : 'ĐẢNG ỦY PHƯỜNG PHÚ CƯỜNG'}
+                </div>
                 <div className="text-base font-black uppercase text-blue-950">SỔ ĐĂNG KÝ VĂN BẢN ĐẾN</div>
                 <div className="text-xs text-slate-500 italic">
                   Tổng số mục trong danh sách: <strong>{filteredDocs.length}</strong> văn bản

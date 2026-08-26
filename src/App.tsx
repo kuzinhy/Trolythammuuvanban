@@ -21,6 +21,8 @@ import DirectiveDrafting from "./pages/DirectiveDrafting";
 import DigitalMap from "./pages/DigitalMap";
 import DocumentAudit from "./pages/DocumentAudit";
 import AiAssistant from "./pages/AiAssistant";
+import Schedule from "./pages/Schedule";
+import Statistics from "./pages/Statistics";
 
 export default function App() {
   const { setUser, setInitialized, isInitialized, user } = useAuthStore();
@@ -64,6 +66,8 @@ export default function App() {
           <Route path="documents" element={<DocumentList />} />
           <Route path="documents/:id" element={<DocumentDetail />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="schedule" element={<Schedule />} />
+          <Route path="statistics" element={<Statistics />} />
           <Route path="search" element={<Search />} />
           <Route path="map" element={<DigitalMap />} />
           <Route path="directive" element={<DirectiveDrafting />} />

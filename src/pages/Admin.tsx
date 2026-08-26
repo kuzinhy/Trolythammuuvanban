@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { 
   ShieldAlert, Settings, Users, FolderGit2, BookOpen, 
   Activity, Save, Plus, Trash2, CheckCircle2, AlertCircle, 
   HardDrive, Sparkles, RefreshCw, Lock, ArrowUpRight, Search, 
   Building2, FileText, CheckSquare, Layers, ShieldCheck, ChevronRight,
   Database, Link2, Download, Upload, Cpu, Server, Check, Clock, BrainCircuit,
-  Pencil, Edit3, X, Filter, BarChart3, Printer, Calendar, AlertTriangle
+  Pencil, Edit3, X, Filter, BarChart3, Printer, Calendar, AlertTriangle,
+  UserCheck, UserPlus, KeyRound, Shield, Sliders, Unlock, Key, FileCheck, Eye, EyeOff,
+  Phone, Mail, MapPin, Landmark, Clock3, AlertOctagon, CheckCheck, RotateCcw
 } from 'lucide-react';
 import { useAuthStore, isSystemAdmin } from '../store/authStore';
-import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig, AssignedOfficer, Document, Task } from '../types';
+import { DepartmentConfig, RoutingRule, LegalBasisItem, SystemConfig, AuditLog, AppConnectionConfig, AssignedOfficer, Document, Task, UserPermissionProfile } from '../types';
 import { 
   db, collection, getDocs, doc, setDoc, deleteDoc, writeBatch, serverTimestamp,
   query, orderBy, limit,
@@ -21,6 +24,8 @@ import {
 import { 
   getActiveLearningRules, saveLearnedAdjustmentRule, LearningRule 
 } from '../lib/learningEngine';
+import WardsAdminTab from '../components/admin/WardsAdminTab';
+import { useWardStore, isSuperAdmin, isWardAdmin } from '../store/wardStore';
 
 // Initial default configuration datasets tailored for Party & Local Government administration
 const INITIAL_OFFICERS: AssignedOfficer[] = [
@@ -114,11 +119,325 @@ const INITIAL_LEGAL_BASIS: LegalBasisItem[] = [
   },
 ];
 
+const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
+  {
+    uid: 'usr-admin',
+    name: 'Đ/c Nguyễn Huy',
+    email: 'nguyenhuy.thudaumot@gmail.com',
+    role: 'ADMIN',
+    roleTitle: 'Quản trị viên / Chánh VP Cấp ủy',
+    department: 'Văn phòng Đảng ủy Phường',
+    wardId: 'all',
+    wardName: 'Toàn hệ thống Cấp ủy',
+    status: 'ACTIVE',
+    phone: '0912345678',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: true,
+      trainAI: true,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: true,
+      exportReports: true,
+      auditDocumentFormat: true
+    },
+    lastActiveAt: 'Vừa xong'
+  },
+  {
+    uid: 'usr-bithu',
+    name: 'Đ/c Trần Văn An',
+    email: 'bithu.danguy@phuong.gov.vn',
+    role: 'LEADER',
+    roleTitle: 'Bí thư Đảng ủy Phường',
+    department: 'Thường trực Đảng ủy',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988123456',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: true,
+      trainAI: true,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: true
+    },
+    lastActiveAt: '10 phút trước'
+  },
+  {
+    uid: 'usr-phobithu',
+    name: 'Đ/c Nguyễn Thị Bích',
+    email: 'phobithu.tt@phuong.gov.vn',
+    role: 'LEADER',
+    roleTitle: 'Phó Bí thư Thường trực Đảng ủy',
+    department: 'Thường trực Đảng ủy',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988234567',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: true,
+      trainAI: true,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: true
+    },
+    lastActiveAt: '1 giờ trước'
+  },
+  {
+    uid: 'usr-chutich',
+    name: 'Đ/c Lê Hoàng Nam',
+    email: 'chutich.ubnd@phuong.gov.vn',
+    role: 'LEADER',
+    roleTitle: 'Phó Bí thư - Chủ tịch UBND Phường',
+    department: 'HĐND & UBND Phường',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988345678',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: true,
+      trainAI: false,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: false
+    },
+    lastActiveAt: 'Hôm qua'
+  },
+  {
+    uid: 'usr-tonghop',
+    name: 'Đ/c Phạm Thị Minh',
+    email: 'chuyenvien.capuy@vanphong.gov.vn',
+    role: 'OFFICE',
+    roleTitle: 'Chuyên viên Tổng hợp Cấp ủy',
+    department: 'Văn phòng Đảng ủy Phường',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988456789',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: false,
+      trainAI: true,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: true
+    },
+    lastActiveAt: '5 phút trước'
+  },
+  {
+    uid: 'usr-vanthu',
+    name: 'Đ/c Vũ Đức Thành',
+    email: 'vanthu.capuy@vanphong.gov.vn',
+    role: 'STAFF',
+    roleTitle: 'Cán bộ Văn thư - Lưu trữ',
+    department: 'Bộ phận Văn thư Cấp ủy',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988567890',
+    permissions: {
+      viewSecretDocs: false,
+      approveDrafts: false,
+      trainAI: false,
+      manageSchedule: false,
+      assignTasks: false,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: true
+    },
+    lastActiveAt: '3 giờ trước'
+  },
+  {
+    uid: 'usr-chibo1',
+    name: 'Đ/c Hoàng Văn Sơn',
+    email: 'bithu.chibo1@phuong.gov.vn',
+    role: 'STAFF',
+    roleTitle: 'Bí thư Chi bộ Khu phố 1',
+    department: 'Chi bộ Khu phố 1',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    status: 'ACTIVE',
+    phone: '0988678901',
+    permissions: {
+      viewSecretDocs: false,
+      approveDrafts: false,
+      trainAI: false,
+      manageSchedule: false,
+      assignTasks: false,
+      systemAdmin: false,
+      exportReports: false,
+      auditDocumentFormat: false
+    },
+    lastActiveAt: '3 ngày trước'
+  }
+];
+
 export default function Admin() {
   const { user } = useAuthStore();
+  const { wards } = useWardStore();
   const isAdmin = isSystemAdmin(user);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'database' | 'brain' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'wards' | 'database' | 'brain' | 'users' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system' | 'reports'>('overview');
+  
+  // Sync tab with URL search parameter
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as any;
+    if (tabFromUrl && ['overview', 'wards', 'database', 'brain', 'users', 'routing', 'learning', 'departments', 'officers', 'legal', 'system', 'reports'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'overview' | 'wards' | 'database' | 'brain' | 'users' | 'routing' | 'learning' | 'departments' | 'officers' | 'legal' | 'system' | 'reports') => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+  
+  const [userPermissions, setUserPermissions] = useState<UserPermissionProfile[]>(() => {
+    const saved = localStorage.getItem('trolycvp_user_permissions');
+    return saved ? JSON.parse(saved) : INITIAL_USER_PERMISSIONS;
+  });
+
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<'ALL' | 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER'>('ALL');
+  const [editingUserPermission, setEditingUserPermission] = useState<UserPermissionProfile | null>(null);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserProfile, setNewUserProfile] = useState({
+    name: '',
+    email: '',
+    role: 'OFFICE' as 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER',
+    roleTitle: 'Chuyên viên Văn phòng',
+    department: 'Văn phòng Đảng ủy Phường',
+    wardId: 'phu-cuong',
+    wardName: 'Đảng ủy Phường Phú Cường',
+    phone: '',
+    permissions: {
+      viewSecretDocs: true,
+      approveDrafts: false,
+      trainAI: true,
+      manageSchedule: true,
+      assignTasks: true,
+      systemAdmin: false,
+      exportReports: true,
+      auditDocumentFormat: true
+    }
+  });
+
+  const filteredUserPermissions = userPermissions.filter(u => {
+    const matchesRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
+    if (!matchesRole) return false;
+    if (!userSearchQuery.trim()) return true;
+    const q = userSearchQuery.toLowerCase();
+    return u.name.toLowerCase().includes(q) ||
+           u.email.toLowerCase().includes(q) ||
+           u.roleTitle.toLowerCase().includes(q) ||
+           u.department.toLowerCase().includes(q) ||
+           (u.phone && u.phone.includes(q));
+  });
+
+  const handleSaveUserPermission = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserPermission) return;
+    const updated = userPermissions.map(u => u.uid === editingUserPermission.uid ? editingUserPermission : u);
+    setUserPermissions(updated);
+    localStorage.setItem('trolycvp_user_permissions', JSON.stringify(updated));
+    
+    setDoc(doc(db, 'user_permissions', editingUserPermission.uid), editingUserPermission, { merge: true })
+      .catch(err => console.warn("Firestore update user permission error:", err));
+      
+    setEditingUserPermission(null);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleAddUserPermission = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserProfile.name.trim() || !newUserProfile.email.trim()) return;
+    const newUser: UserPermissionProfile = {
+      uid: `usr-${Date.now()}`,
+      name: newUserProfile.name.trim(),
+      email: newUserProfile.email.trim(),
+      role: newUserProfile.role,
+      roleTitle: newUserProfile.roleTitle.trim() || 'Cán bộ Văn phòng',
+      department: newUserProfile.department.trim() || 'Văn phòng Đảng ủy Phường',
+      wardId: newUserProfile.wardId,
+      wardName: newUserProfile.wardName,
+      status: 'ACTIVE',
+      phone: newUserProfile.phone.trim(),
+      permissions: { ...newUserProfile.permissions },
+      lastActiveAt: 'Mới tạo'
+    };
+    const updated = [...userPermissions, newUser];
+    setUserPermissions(updated);
+    localStorage.setItem('trolycvp_user_permissions', JSON.stringify(updated));
+    
+    setDoc(doc(db, 'user_permissions', newUser.uid), newUser, { merge: true })
+      .catch(err => console.warn("Firestore create user permission error:", err));
+      
+    setShowAddUserModal(false);
+    setNewUserProfile({
+      name: '',
+      email: '',
+      role: 'OFFICE',
+      roleTitle: 'Chuyên viên Văn phòng',
+      department: 'Văn phòng Đảng ủy Phường',
+      wardId: 'phu-cuong',
+      wardName: 'Đảng ủy Phường Phú Cường',
+      phone: '',
+      permissions: {
+        viewSecretDocs: true,
+        approveDrafts: false,
+        trainAI: true,
+        manageSchedule: true,
+        assignTasks: true,
+        systemAdmin: false,
+        exportReports: true,
+        auditDocumentFormat: true
+      }
+    });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleTogglePermission = (uid: string, permKey: keyof UserPermissionProfile['permissions']) => {
+    const updated = userPermissions.map(u => {
+      if (u.uid === uid) {
+        return {
+          ...u,
+          permissions: {
+            ...u.permissions,
+            [permKey]: !u.permissions[permKey]
+          }
+        };
+      }
+      return u;
+    });
+    setUserPermissions(updated);
+    localStorage.setItem('trolycvp_user_permissions', JSON.stringify(updated));
+  };
+
+  const handleToggleUserStatus = (uid: string) => {
+    const updated = userPermissions.map(u => {
+      if (u.uid === uid) {
+        const newStatus: UserPermissionProfile['status'] = u.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+        return { ...u, status: newStatus };
+      }
+      return u;
+    });
+    setUserPermissions(updated);
+    localStorage.setItem('trolycvp_user_permissions', JSON.stringify(updated));
+  };
   
   const [reportsDocuments, setReportsDocuments] = useState<Document[]>([]);
   const [reportsTasks, setReportsTasks] = useState<Task[]>([]);
@@ -189,15 +508,35 @@ export default function Admin() {
 
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(() => {
     const saved = localStorage.getItem('trolycvp_system_config');
-    return saved ? JSON.parse(saved) : {
-      defaultDriveFolderId: TARGET_DRIVE_FOLDER_ID,
-      defaultDriveFolderName: 'Hồ sơ lưu trữ Văn bản Tham mưu',
-      preferredAiModel: 'gemini-3.1-flash-lite',
-      autoExtractTasksOnUpload: true,
-      enableDriveAutoUpload: true,
-      defaultSignerTitle: 'Chánh Văn phòng',
-      organizationName: 'Văn phòng Cấp ủy & Chính quyền',
-      connectedApp: DEFAULT_APP_CONNECTION
+    const parsed = saved ? JSON.parse(saved) : {};
+    return {
+      // Ward Metadata
+      wardName: parsed.wardName || 'Đảng ủy Phường Phú Cường',
+      districtName: parsed.districtName || 'Thành phố Thủ Dầu Một',
+      provinceName: parsed.provinceName || 'Tỉnh Bình Dương',
+      parentOrganization: parsed.parentOrganization || 'Thành ủy Thủ Dầu Một',
+      officeAddress: parsed.officeAddress || 'Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một',
+      contactPhone: parsed.contactPhone || '0274 3822 123',
+      contactEmail: parsed.contactEmail || 'vanphong.danguy@phucuong.gov.vn',
+      technicalSupportContact: parsed.technicalSupportContact || 'Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (SĐT: 0912.345.678)',
+
+      // Processing Priority Rules
+      normalDocDeadlineDays: parsed.normalDocDeadlineDays ?? 3,
+      urgentDocDeadlineHours: parsed.urgentDocDeadlineHours ?? 24,
+      superUrgentDocDeadlineHours: parsed.superUrgentDocDeadlineHours ?? 4,
+      reminderBeforeHours: parsed.reminderBeforeHours ?? 12,
+      autoAssignEnabled: parsed.autoAssignEnabled ?? true,
+      strictSecretMode: parsed.strictSecretMode ?? true,
+
+      // Storage & AI
+      defaultDriveFolderId: parsed.defaultDriveFolderId || TARGET_DRIVE_FOLDER_ID,
+      defaultDriveFolderName: parsed.defaultDriveFolderName || 'Hồ sơ lưu trữ Văn bản Tham mưu',
+      preferredAiModel: parsed.preferredAiModel || 'gemini-3.1-flash-lite',
+      autoExtractTasksOnUpload: parsed.autoExtractTasksOnUpload ?? true,
+      enableDriveAutoUpload: parsed.enableDriveAutoUpload ?? true,
+      defaultSignerTitle: parsed.defaultSignerTitle || 'Bí thư Đảng ủy Phường',
+      organizationName: parsed.organizationName || 'Đảng ủy - HĐND - UBND Phường Phú Cường',
+      connectedApp: parsed.connectedApp || DEFAULT_APP_CONNECTION
     };
   });
 
@@ -840,8 +1179,8 @@ export default function Admin() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 border-b border-slate-100">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 flex-shrink-0">Vận hành:</span>
           <button
-            onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('overview')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'overview'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -852,8 +1191,57 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('database')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('wards')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'wards'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-2 ring-purple-300'
+                : 'text-purple-900 bg-purple-50/90 hover:bg-purple-100 border border-purple-200'
+            }`}
+          >
+            <Landmark className="w-3.5 h-3.5 text-purple-600" />
+            <span>Đơn vị & Phường/Xã</span>
+            <span className="px-1.5 py-0.2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[8px] font-black rounded uppercase">SuperAdmin</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('system')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'system'
+                ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
+                : 'text-blue-900 bg-blue-50/90 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5 text-blue-600" />
+            <span>Cấu hình Tham số</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('users')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
+                : 'text-amber-900 bg-amber-50/90 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+            <span>Phân quyền Cán bộ ({userPermissions.length})</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('brain')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'brain'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                : 'text-indigo-900 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200'
+            }`}
+          >
+            <BrainCircuit className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span>Bộ Não AI Drive</span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('database')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'database'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-blue-700 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/60'
@@ -865,32 +1253,8 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('brain')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'brain'
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
-                : 'text-indigo-900 bg-indigo-50/90 hover:bg-indigo-100 border border-indigo-200'
-            }`}
-          >
-            <BrainCircuit className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
-            <span>Bộ Não AI Drive</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('system')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'system'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span>Cấu hình AI</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('reports')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'reports'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -905,8 +1269,8 @@ export default function Admin() {
         <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-2 flex-shrink-0">Quy tắc & NS:</span>
           <button
-            onClick={() => setActiveTab('routing')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('routing')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'routing'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -917,8 +1281,8 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('learning')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('learning')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'learning'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-emerald-800 bg-emerald-50/90 hover:bg-emerald-100 border border-emerald-300'
@@ -929,8 +1293,8 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('departments')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('departments')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'departments'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -941,8 +1305,8 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('officers')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('officers')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'officers'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -953,8 +1317,8 @@ export default function Admin() {
           </button>
 
           <button
-            onClick={() => setActiveTab('legal')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            onClick={() => handleTabChange('legal')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'legal'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
@@ -965,6 +1329,833 @@ export default function Admin() {
           </button>
         </div>
       </div>
+
+      {/* TAB: MULTI-WARD & ADMINISTRATIVE UNITS MANAGEMENT */}
+      {activeTab === 'wards' && (
+        <WardsAdminTab onNavigateTab={(tab, filterWardId) => handleTabChange(tab as any)} />
+      )}
+
+      {/* TAB: USER PERMISSION PROFILE */}
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-white/95 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-blue-200/80 shadow-md space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/25 flex-shrink-0">
+                  <ShieldCheck className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                      Bảng Điều Khiển Phân Quyền Người Dùng (User Role Management)
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-extrabold border border-amber-300 flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-amber-600" />
+                      RBAC CẤP UỶ PHƯỜNG
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 max-w-2xl">
+                    Quản lý tài khoản cán bộ, cấp quyền truy cập các tính năng chuyên biệt (Văn bản Mật, Duyệt dự thảo, Huấn luyện AI, Lịch công tác Thường trực, Giao nhiệm vụ) chuẩn hóa theo Quy chế làm việc Cấp ủy Phường.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setShowAddUserModal(true)}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Cấp quyền Cán bộ Mới</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (window.confirm("Đồng chí có chắc chắn muốn khôi phục ma trận phân quyền cán bộ về mặc định chuẩn Cấp ủy?")) {
+                      setUserPermissions(INITIAL_USER_PERMISSIONS);
+                      localStorage.setItem('trolycvp_user_permissions', JSON.stringify(INITIAL_USER_PERMISSIONS));
+                      setSaveSuccess(true);
+                      setTimeout(() => setSaveSuccess(false), 3000);
+                    }
+                  }}
+                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Khôi phục Mặc định</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Role Statistics Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              <div className="p-4 rounded-2xl bg-purple-50/70 border border-purple-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-purple-700">Quản trị viên (ADMIN)</span>
+                  <Key className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="text-2xl font-black text-purple-900">
+                  {userPermissions.filter(u => u.role === 'ADMIN').length}
+                </div>
+                <div className="text-[10px] text-purple-600 font-medium">Toàn quyền hệ thống</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-blue-700">Thường trực & Lãnh đạo</span>
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="text-2xl font-black text-blue-900">
+                  {userPermissions.filter(u => u.role === 'LEADER').length}
+                </div>
+                <div className="text-[10px] text-blue-600 font-medium">Duyệt & Chỉ đạo</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-emerald-700">Văn phòng Cấp ủy</span>
+                  <Users className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="text-2xl font-black text-emerald-900">
+                  {userPermissions.filter(u => u.role === 'OFFICE').length}
+                </div>
+                <div className="text-[10px] text-emerald-600 font-medium">Tham mưu & Tổng hợp</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-rose-700">Quyền Văn bản Mật</span>
+                  <Lock className="w-4 h-4 text-rose-600" />
+                </div>
+                <div className="text-2xl font-black text-rose-900">
+                  {userPermissions.filter(u => u.permissions.viewSecretDocs).length}
+                </div>
+                <div className="text-[10px] text-rose-600 font-medium">Cán bộ được xem VB Mật</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-100 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-amber-700">Quyền Huấn Luyện AI</span>
+                  <BrainCircuit className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="text-2xl font-black text-amber-900">
+                  {userPermissions.filter(u => u.permissions.trainAI).length}
+                </div>
+                <div className="text-[10px] text-amber-600 font-medium">Được nạp tri thức cho AI</div>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên cán bộ, email, chức danh, phòng ban..."
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                <span className="text-[11px] font-bold text-slate-500 mr-1 flex-shrink-0">Lọc vai trò:</span>
+                {[
+                  { id: 'ALL', label: 'Tất cả' },
+                  { id: 'ADMIN', label: 'Quản trị' },
+                  { id: 'LEADER', label: 'Lãnh đạo' },
+                  { id: 'OFFICE', label: 'Văn phòng' },
+                  { id: 'STAFF', label: 'Chuyên viên' },
+                ].map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setUserRoleFilter(r.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                      userRoleFilter === r.id
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Permissions Matrix Table */}
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-xs">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3.5 px-4 min-w-[200px]">Cán bộ & Email</th>
+                    <th className="py-3.5 px-4 min-w-[170px]">Vai trò & Chức danh</th>
+                    <th className="py-3.5 px-4 min-w-[160px]">Đơn vị (Phường/Xã)</th>
+                    <th className="py-3.5 px-4 min-w-[160px]">Phòng ban / Chi bộ</th>
+                    <th className="py-3.5 px-4">Quyền hạn Tính năng Chuyên biệt (Nhấp để Bật/Tắt)</th>
+                    <th className="py-3.5 px-4 text-right min-w-[120px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-xs">
+                  {filteredUserPermissions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        Không tìm thấy tài khoản cán bộ phù hợp với điều kiện tìm kiếm.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUserPermissions.map(u => {
+                      const isLocked = u.status === 'LOCKED';
+                      return (
+                        <tr key={u.uid} className={`hover:bg-blue-50/40 transition-colors ${isLocked ? 'opacity-60 bg-slate-50' : ''}`}>
+                          {/* User identity */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-black text-xs flex-shrink-0 shadow-xs ${
+                                u.role === 'ADMIN' ? 'bg-purple-600' :
+                                u.role === 'LEADER' ? 'bg-blue-600' :
+                                u.role === 'OFFICE' ? 'bg-emerald-600' : 'bg-slate-600'
+                              }`}>
+                                {u.name.split(' ').pop()?.[0] || 'U'}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span>{u.name}</span>
+                                  {isLocked && (
+                                    <span className="px-1.5 py-0.2 bg-red-100 text-red-700 rounded text-[9px] font-black">
+                                      KHÓA
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate">{u.email}</div>
+                                {u.phone && <div className="text-[10px] text-slate-400">SĐT: {u.phone}</div>}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Role & Title */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              <span className={`inline-block px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                u.role === 'ADMIN' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                u.role === 'LEADER' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                u.role === 'OFFICE' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                                'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}>
+                                {u.role === 'ADMIN' ? 'Quản trị viên' :
+                                 u.role === 'LEADER' ? 'Lãnh đạo Cấp ủy' :
+                                 u.role === 'OFFICE' ? 'Văn phòng Cấp ủy' : 'Chuyên viên / Cán bộ'}
+                              </span>
+                              <div className="font-semibold text-slate-800 text-xs">{u.roleTitle}</div>
+                            </div>
+                          </td>
+
+                          {/* Ward/Unit assignment */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                              <span className="font-bold text-slate-800">
+                                {u.wardName ? u.wardName.replace('Đảng ủy Phường ', 'P. ') : 'Toàn hệ thống'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Department */}
+                          <td className="py-3.5 px-4 font-medium text-slate-700">
+                            {u.department}
+                          </td>
+
+                          {/* Special Feature Permissions Chips */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {/* 1. View Secret Docs */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'viewSecretDocs')}
+                                title="Click để Bật/Tắt quyền xem Văn bản Mật"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.viewSecretDocs
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <Lock className="w-3 h-3" />
+                                <span>VB Mật</span>
+                              </button>
+
+                              {/* 2. Approve Drafts */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'approveDrafts')}
+                                title="Click để Bật/Tắt quyền Phê duyệt Dự thảo"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.approveDrafts
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <FileCheck className="w-3 h-3" />
+                                <span>Duyệt Dự thảo</span>
+                              </button>
+
+                              {/* 3. Train AI */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'trainAI')}
+                                title="Click để Bật/Tắt quyền Huấn luyện AI"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.trainAI
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <BrainCircuit className="w-3 h-3 text-amber-600" />
+                                <span>Huấn luyện AI</span>
+                              </button>
+
+                              {/* 4. Manage Schedule */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'manageSchedule')}
+                                title="Click để Bật/Tắt quyền Quản lý Lịch công tác"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.manageSchedule
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                <span>Lịch Thường trực</span>
+                              </button>
+
+                              {/* 5. Assign Tasks */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'assignTasks')}
+                                title="Click để Bật/Tắt quyền Giao nhiệm vụ"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.assignTasks
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <CheckSquare className="w-3 h-3" />
+                                <span>Đôn đốc Nhiệm vụ</span>
+                              </button>
+
+                              {/* 6. System Admin */}
+                              <button
+                                onClick={() => handleTogglePermission(u.uid, 'systemAdmin')}
+                                title="Click để Bật/Tắt quyền Quản trị Hệ thống"
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold border flex items-center gap-1 transition-all ${
+                                  u.permissions.systemAdmin
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 hover:opacity-100'
+                                }`}
+                              >
+                                <Settings className="w-3 h-3" />
+                                <span>Quản trị Hệ thống</span>
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setEditingUserPermission({ ...u, permissions: { ...u.permissions } })}
+                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                title="Chỉnh sửa phân quyền chi tiết"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+
+                              <button
+                                onClick={() => handleToggleUserStatus(u.uid)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  isLocked
+                                    ? 'text-emerald-600 hover:bg-emerald-100'
+                                    : 'text-amber-600 hover:bg-amber-100'
+                                }`}
+                                title={isLocked ? "Mở khóa tài khoản" : "Khóa tài khoản"}
+                              >
+                                {isLocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Ward Party Committee Standard Authorization Guide */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-blue-600" />
+                <span>Quy chuẩn Phân quyền Cán bộ theo Quy chế làm việc Đảng ủy Phường</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Thường trực & Lãnh đạo Cấp ủy</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Xem toàn bộ Văn bản Mật, Duyệt dự thảo kết luận, Ký số Phiếu trình, Giao chỉ đạo trực tiếp và duyệt Lịch công tác Thường trực hằng tuần.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
+                  <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Văn phòng Đảng ủy - UBND</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Tham mưu phân luồng văn bản đến, Lập dự thảo Phiếu trình, Huấn luyện Bộ não AI, Đôn đốc tiến độ nhiệm vụ các chi bộ/ban ngành.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 space-y-1">
+                  <div className="font-bold text-purple-900 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Quản trị viên Hệ thống (Admin)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Quản lý tài khoản, Phân quyền người dùng, Cấu hình API Key Gemini, Đồng bộ Google Drive lưu trữ và xuất/nhập sao lưu dữ liệu.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USER PERMISSION MODAL */}
+      {editingUserPermission && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Chỉnh sửa Phân quyền Cán bộ: {editingUserPermission.name}
+                  </h3>
+                  <p className="text-xs text-slate-500">{editingUserPermission.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingUserPermission(null)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserPermission} className="space-y-5 text-xs">
+              {/* Basic Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Chức danh / Vị trí Cấp ủy</label>
+                  <input
+                    type="text"
+                    value={editingUserPermission.roleTitle}
+                    onChange={(e) => setEditingUserPermission({ ...editingUserPermission, roleTitle: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="VD: Bí thư Đảng ủy, Chánh VP..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Vai trò Phân quyền Hệ thống</label>
+                  <select
+                    value={editingUserPermission.role}
+                    onChange={(e) => setEditingUserPermission({ ...editingUserPermission, role: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="ADMIN">Quản trị viên (ADMIN)</option>
+                    <option value="LEADER">Lãnh đạo & Thường trực Cấp ủy (LEADER)</option>
+                    <option value="OFFICE">Văn phòng Cấp ủy / Tổng hợp (OFFICE)</option>
+                    <option value="STAFF">Chuyên viên / Cán bộ Văn thư (STAFF)</option>
+                    <option value="VIEWER">Người xem hạn chế (VIEWER)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Phòng ban / Chi bộ trực thuộc</label>
+                  <input
+                    type="text"
+                    value={editingUserPermission.department}
+                    onChange={(e) => setEditingUserPermission({ ...editingUserPermission, department: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="VD: Văn phòng Đảng ủy Phường..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Đơn vị Hành chính quản lý (Phường/Xã)</label>
+                  <select
+                    value={editingUserPermission.wardId || 'all'}
+                    onChange={(e) => {
+                      const selectedWardId = e.target.value;
+                      const selectedWard = wards.find(w => w.id === selectedWardId);
+                      setEditingUserPermission({
+                        ...editingUserPermission,
+                        wardId: selectedWardId,
+                        wardName: selectedWard ? selectedWard.name : 'Toàn hệ thống Cấp ủy'
+                      });
+                    }}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="all">Toàn hệ thống Cấp ủy (Super Admin / Thành phố)</option>
+                    {wards.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Số điện thoại liên hệ</label>
+                  <input
+                    type="text"
+                    value={editingUserPermission.phone || ''}
+                    onChange={(e) => setEditingUserPermission({ ...editingUserPermission, phone: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="VD: 0912345678"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Template Preset Buttons */}
+              <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-100 space-y-2">
+                <div className="text-[11px] font-black text-blue-900 uppercase">Mẫu phân quyền chuẩn nhanh:</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUserPermission({
+                      ...editingUserPermission,
+                      role: 'LEADER',
+                      permissions: { viewSecretDocs: true, approveDrafts: true, trainAI: true, manageSchedule: true, assignTasks: true, systemAdmin: false, exportReports: true, auditDocumentFormat: true }
+                    })}
+                    className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-800 rounded-lg text-[10px] font-bold border border-blue-200 shadow-2xs"
+                  >
+                    Mẫu Thường trực Đảng ủy
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingUserPermission({
+                      ...editingUserPermission,
+                      role: 'OFFICE',
+                      permissions: { viewSecretDocs: true, approveDrafts: false, trainAI: true, manageSchedule: true, assignTasks: true, systemAdmin: false, exportReports: true, auditDocumentFormat: true }
+                    })}
+                    className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-bold border border-emerald-200 shadow-2xs"
+                  >
+                    Mẫu Chuyên viên VP
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingUserPermission({
+                      ...editingUserPermission,
+                      role: 'STAFF',
+                      permissions: { viewSecretDocs: false, approveDrafts: false, trainAI: false, manageSchedule: false, assignTasks: false, systemAdmin: false, exportReports: true, auditDocumentFormat: true }
+                    })}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-200 shadow-2xs"
+                  >
+                    Mẫu Văn thư Lưu trữ
+                  </button>
+                </div>
+              </div>
+
+              {/* Switch Toggles for 8 Specialized Permissions */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span>Cấp quyền Truy cập Tính năng Chuyên biệt (8 Quyền Hạn)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* 1. viewSecretDocs */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Xem Văn bản Mật & Nội bộ</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Truy cập văn bản có độ mật Cấp ủy</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.viewSecretDocs}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, viewSecretDocs: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* 2. approveDrafts */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Phê duyệt & Ký số Phiếu trình</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Duyệt dự thảo và chỉ đạo tham mưu</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.approveDrafts}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, approveDrafts: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* 3. trainAI */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <BrainCircuit className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Huấn luyện Bộ não AI</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Nạp quy tắc máy học và chỉ đạo thực tế</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.trainAI}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, trainAI: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* 4. manageSchedule */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Lịch công tác Thường trực</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Quản lý và duyệt lịch công tác tuần</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.manageSchedule}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, manageSchedule: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* 5. assignTasks */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Giao & Đôn đốc Nhiệm vụ</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Giao nhiệm vụ cho Chi bộ & Ban ngành</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.assignTasks}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, assignTasks: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* 6. systemAdmin */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <Settings className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Quản trị Hệ thống & CSDL</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">Cấu hình API Key, Backup và Admin</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editingUserPermission.permissions.systemAdmin}
+                      onChange={(e) => setEditingUserPermission({
+                        ...editingUserPermission,
+                        permissions: { ...editingUserPermission.permissions, systemAdmin: e.target.checked }
+                      })}
+                      className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingUserPermission(null)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 font-bold hover:bg-slate-100"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20"
+                >
+                  Lưu Cập Nhật Phân Quyền
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD NEW USER MODAL */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Thêm Cán bộ & Cấp quyền Truy cập</h3>
+                  <p className="text-xs text-slate-500">Khai báo thông tin tài khoản cán bộ Cấp ủy Phường</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddUserModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddUserPermission} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Họ và tên cán bộ *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Đ/c Nguyễn Văn B"
+                  value={newUserProfile.name}
+                  onChange={(e) => setNewUserProfile({ ...newUserProfile, name: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Email công tác *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="VD: nguyenvanb@phuong.gov.vn"
+                    value={newUserProfile.email}
+                    onChange={(e) => setNewUserProfile({ ...newUserProfile, email: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Số điện thoại</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 0912345678"
+                    value={newUserProfile.phone}
+                    onChange={(e) => setNewUserProfile({ ...newUserProfile, phone: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Chức danh / Vị trí</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Phó Bí thư Thường trực, Chuyên viên..."
+                    value={newUserProfile.roleTitle}
+                    onChange={(e) => setNewUserProfile({ ...newUserProfile, roleTitle: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Vai trò hệ thống</label>
+                  <select
+                    value={newUserProfile.role}
+                    onChange={(e) => setNewUserProfile({ ...newUserProfile, role: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="LEADER">Lãnh đạo & Thường trực Cấp ủy (LEADER)</option>
+                    <option value="OFFICE">Văn phòng Cấp ủy (OFFICE)</option>
+                    <option value="STAFF">Chuyên viên / Cán bộ Chi bộ (STAFF)</option>
+                    <option value="ADMIN">Quản trị viên (ADMIN)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Phòng ban / Chi bộ trực thuộc</label>
+                <input
+                  type="text"
+                  placeholder="VD: Văn phòng Đảng ủy Phường, Chi bộ 1..."
+                  value={newUserProfile.department}
+                  onChange={(e) => setNewUserProfile({ ...newUserProfile, department: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Đơn vị Hành chính quản lý (Phường/Xã)</label>
+                <select
+                  value={newUserProfile.wardId || 'phu-cuong'}
+                  onChange={(e) => {
+                    const selectedWardId = e.target.value;
+                    const selectedWard = wards.find(w => w.id === selectedWardId);
+                    setNewUserProfile({
+                      ...newUserProfile,
+                      wardId: selectedWardId,
+                      wardName: selectedWard ? selectedWard.name : 'Đảng ủy Phường Phú Cường'
+                    });
+                  }}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Toàn hệ thống Cấp ủy (Super Admin / Thành phố)</option>
+                  {wards.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddUserModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 font-bold hover:bg-slate-100"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20"
+                >
+                  Xác Nhận & Cấp Quyền
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* TAB: DATABASE & MEMORY CONNECTION */}
       {activeTab === 'database' && (
@@ -2555,51 +3746,435 @@ export default function Admin() {
         </div>
       )}
 
-      {/* TAB 5: SYSTEM CONFIG */}
+      {/* TAB 5: SYSTEM CONFIG - THIẾT LẬP ĐƠN VỊ PHƯỜNG & QUY TẮC XỬ LÝ VĂN BẢN */}
       {activeTab === 'system' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Google Drive Configuration */}
+          {/* Header Action Banner */}
+          <div className="bg-white/95 backdrop-blur-md p-6 rounded-3xl border border-blue-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                <Landmark className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-black text-slate-900">Cấu hình Đơn vị Phường & Tham số Vận hành Cấp ủy</h2>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold uppercase tracking-wide">
+                    Chuẩn hóa Phường Phú Cường
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                  Thiết lập danh xưng hành chính, thông tin liên hệ thường trực, quy chuẩn thời hạn xử lý văn bản và cơ chế bảo mật cho Văn phòng Cấp ủy Phường.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setSystemConfig({
+                    ...systemConfig,
+                    wardName: 'Đảng ủy Phường Phú Cường',
+                    organizationName: 'Đảng ủy - HĐND - UBND Phường Phú Cường',
+                    parentOrganization: 'Thành ủy Thủ Dầu Một',
+                    provinceName: 'Tỉnh Bình Dương',
+                    districtName: 'Thành phố Thủ Dầu Một',
+                    officeAddress: 'Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một',
+                    contactPhone: '0274 3822 123',
+                    contactEmail: 'vanphong.danguy@phucuong.gov.vn',
+                    technicalSupportContact: 'Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (SĐT: 0912.345.678)',
+                    normalDocDeadlineDays: 3,
+                    urgentDocDeadlineHours: 24,
+                    superUrgentDocDeadlineHours: 4,
+                    reminderBeforeHours: 12,
+                    autoAssignEnabled: true,
+                    strictSecretMode: true,
+                    defaultSignerTitle: 'Bí thư Đảng ủy Phường'
+                  });
+                }}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Tải lại giá trị mặc định chuẩn Phường Phú Cường"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Nạp Mẫu Chuẩn Phường</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveAll}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{saveSuccess ? 'Đã lưu cài đặt!' : 'Lưu Thay đổi Cấu hình'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* THẺ 1: THÔNG TIN ĐƠN VỊ HÀNH CHÍNH & LIÊN HỆ */}
             <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">1. Thông tin Đơn vị Hành chính Phường</h3>
+                  <p className="text-[11px] text-slate-500">Tên cơ quan, cấp trên trực tiếp và địa chỉ trụ sở</p>
+                </div>
+              </div>
+
+              <div className="space-y-3.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Tên Cơ quan Cấp ủy Phường <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={systemConfig.wardName || ''}
+                    onChange={e => setSystemConfig({ ...systemConfig, wardName: e.target.value })}
+                    placeholder="VD: Đảng ủy Phường Phú Cường"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Cơ quan Cấp trên Trực tiếp <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={systemConfig.parentOrganization || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, parentOrganization: e.target.value })}
+                      placeholder="VD: Thành ủy Thủ Dầu Một"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Khối Cơ quan Phối hợp <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={systemConfig.organizationName || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, organizationName: e.target.value })}
+                      placeholder="VD: Đảng ủy - HĐND - UBND Phường"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Quận / Huyện / Thành phố
+                    </label>
+                    <input
+                      type="text"
+                      value={systemConfig.districtName || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, districtName: e.target.value })}
+                      placeholder="VD: Thành phố Thủ Dầu Một"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                      Tỉnh / Thành phố trực thuộc
+                    </label>
+                    <input
+                      type="text"
+                      value={systemConfig.provinceName || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, provinceName: e.target.value })}
+                      placeholder="VD: Tỉnh Bình Dương"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Địa chỉ Trụ sở Đảng ủy Phường</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={systemConfig.officeAddress || ''}
+                    onChange={e => setSystemConfig({ ...systemConfig, officeAddress: e.target.value })}
+                    placeholder="VD: Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Điện thoại Thường trực / Trực ban</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={systemConfig.contactPhone || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, contactPhone: e.target.value })}
+                      placeholder="VD: 0274 3822 123"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Email Tiếp nhận Văn bản Điện tử</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={systemConfig.contactEmail || ''}
+                      onChange={e => setSystemConfig({ ...systemConfig, contactEmail: e.target.value })}
+                      placeholder="VD: vanphong.danguy@phucuong.gov.vn"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-2xl">
+                  <label className="block text-[11px] font-bold text-blue-900 uppercase mb-1 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Đầu mối Kỹ thuật & CNTT Hỗ trợ Cán bộ Phường</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={systemConfig.technicalSupportContact || ''}
+                    onChange={e => setSystemConfig({ ...systemConfig, technicalSupportContact: e.target.value })}
+                    placeholder="VD: Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (SĐT: 0912.345.678)"
+                    className="w-full p-2 bg-white border border-blue-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[10px] text-blue-700 mt-1">Thông tin này hiển thị ở chân trang và trong hướng dẫn khi cán bộ cần hỗ trợ kỹ thuật.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* THẺ 2: QUY TẮC ƯU TIÊN & THỜI HẠN XỬ LÝ VĂN BẢN */}
+            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
+                <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
+                  <Clock3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">2. Quy tắc Ưu tiên & Thời hạn Xử lý Văn bản</h3>
+                  <p className="text-[11px] text-slate-500">Quy định deadline xử lý văn bản theo từng cấp độ khẩn</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Văn bản Thường</span>
+                    <div className="flex items-center justify-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={systemConfig.normalDocDeadlineDays ?? 3}
+                        onChange={e => setSystemConfig({ ...systemConfig, normalDocDeadlineDays: parseInt(e.target.value) || 3 })}
+                        className="w-16 p-1.5 bg-white border border-slate-300 rounded-lg text-center text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-xs font-bold text-slate-600">ngày</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">Xử lý tiêu chuẩn</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-center">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase block mb-1">Văn bản Khẩn</span>
+                    <div className="flex items-center justify-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="72"
+                        value={systemConfig.urgentDocDeadlineHours ?? 24}
+                        onChange={e => setSystemConfig({ ...systemConfig, urgentDocDeadlineHours: parseInt(e.target.value) || 24 })}
+                        className="w-16 p-1.5 bg-white border border-amber-300 rounded-lg text-center text-sm font-black text-amber-900 outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <span className="text-xs font-bold text-amber-800">giờ</span>
+                    </div>
+                    <span className="text-[10px] text-amber-600 mt-1 block">Trong ngày làm việc</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+                    <span className="text-[10px] font-bold text-rose-800 uppercase block mb-1">Hỏa tốc / Thượng khẩn</span>
+                    <div className="flex items-center justify-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={systemConfig.superUrgentDocDeadlineHours ?? 4}
+                        onChange={e => setSystemConfig({ ...systemConfig, superUrgentDocDeadlineHours: parseInt(e.target.value) || 4 })}
+                        className="w-16 p-1.5 bg-white border border-rose-300 rounded-lg text-center text-sm font-black text-rose-900 outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+                      <span className="text-xs font-bold text-rose-800">giờ</span>
+                    </div>
+                    <span className="text-[10px] text-rose-600 mt-1 block">Ưu tiên số 1</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Cảnh báo Đôn đốc Tự động Trước hạn
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="1"
+                      max="48"
+                      value={systemConfig.reminderBeforeHours ?? 12}
+                      onChange={e => setSystemConfig({ ...systemConfig, reminderBeforeHours: parseInt(e.target.value) || 12 })}
+                      className="w-24 p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-800 text-center outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-medium text-slate-600">giờ trước khi hết hạn (Hệ thống sẽ gắn cờ cam đôn đốc chuyên viên)</span>
+                  </div>
+                </div>
+
+                {/* Toggles */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Tự động Phân luồng & Gợi ý Cán bộ thụ lý bằng AI</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500">Hệ thống phân tích nội dung văn bản và tự động đề xuất chuyên viên phù hợp</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={systemConfig.autoAssignEnabled ?? true}
+                      onChange={e => setSystemConfig({ ...systemConfig, autoAssignEnabled: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200">
+                    <div>
+                      <div className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Chế độ Kiểm soát Nghiêm ngặt Văn bản Mật Cấp ủy</span>
+                      </div>
+                      <div className="text-[10px] text-rose-700">Yêu cầu quyền hạn đặc biệt & xác thực bổ sung để xem văn bản có gắn cờ Mật / Tối mật</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={systemConfig.strictSecretMode ?? true}
+                      onChange={e => setSystemConfig({ ...systemConfig, strictSecretMode: e.target.checked })}
+                      className="w-4 h-4 text-rose-600 rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* THẺ 3: CẤU HÌNH TRÍ TUỆ NHÂN TẠO GEMINI */}
+            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">3. Cấu hình Trí tuệ Nhân tạo Gemini</h3>
+                  <p className="text-[11px] text-slate-500">Mô hình phân tích, trích xuất và soạn thảo dự thảo cấp ủy</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mô hình AI Ưu tiên</label>
+                  <select
+                    value={systemConfig.preferredAiModel}
+                    onChange={e => setSystemConfig({ ...systemConfig, preferredAiModel: e.target.value as any })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Siêu tốc & Tiết kiệm độ trễ - Khuyên dùng)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cân bằng tốc độ và phân tích sâu)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Phân tích văn bản phức tạp & độ chính xác cao)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Chức danh người ký duyệt đề xuất trên Phiếu Trình</label>
+                  <input
+                    type="text"
+                    value={systemConfig.defaultSignerTitle || ''}
+                    onChange={e => setSystemConfig({ ...systemConfig, defaultSignerTitle: e.target.value })}
+                    placeholder="VD: Bí thư Đảng ủy Phường / Chánh Văn phòng"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-indigo-50/60 border border-indigo-200">
+                  <div>
+                    <div className="text-xs font-bold text-indigo-900">Tự động trích xuất nhiệm vụ & thời hạn khi tiếp nhận văn bản</div>
+                    <div className="text-[10px] text-indigo-700">AI tự động tạo công việc tương ứng vào sổ theo dõi</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={systemConfig.autoExtractTasksOnUpload ?? true}
+                    onChange={e => setSystemConfig({ ...systemConfig, autoExtractTasksOnUpload: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* THẺ 4: CẤU HÌNH LƯU TRỮ GOOGLE DRIVE */}
+            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
                   <HardDrive className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Cấu hình Lưu trữ Google Drive</h3>
-                  <p className="text-[11px] text-slate-500">Đồng bộ tự động văn bản gốc và hồ sơ số hóa</p>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">4. Cấu hình Lưu trữ Hồ sơ Google Drive</h3>
+                  <p className="text-[11px] text-slate-500">Đồng bộ tự động văn bản gốc và hồ sơ số hóa của Cấp ủy</p>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-1">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mã Thư mục Lưu trữ (Folder ID)</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mã Thư mục Lưu trữ Google Drive (Folder ID)</label>
                   <input
                     type="text"
-                    value={systemConfig.defaultDriveFolderId}
+                    value={systemConfig.defaultDriveFolderId || ''}
                     onChange={e => setSystemConfig({ ...systemConfig, defaultDriveFolderId: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tên Thư mục Lưu trữ Hiển thị</label>
+                  <input
+                    type="text"
+                    value={systemConfig.defaultDriveFolderName || ''}
+                    onChange={e => setSystemConfig({ ...systemConfig, defaultDriveFolderName: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200">
                   <div>
                     <div className="text-xs font-bold text-slate-800">Tự động đẩy file lên Google Drive</div>
-                    <div className="text-[10px] text-slate-500">Đồng bộ ngay khi tiếp nhận văn bản</div>
+                    <div className="text-[10px] text-slate-500">Đồng bộ ngay khi cán bộ tải lên văn bản hoặc ban hành dự thảo</div>
                   </div>
                   <input
                     type="checkbox"
-                    checked={systemConfig.enableDriveAutoUpload}
+                    checked={systemConfig.enableDriveAutoUpload ?? true}
                     onChange={e => setSystemConfig({ ...systemConfig, enableDriveAutoUpload: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded"
+                    className="w-4 h-4 text-blue-600 rounded cursor-pointer"
                   />
                 </div>
 
-                <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                <div className="pt-1 flex flex-col sm:flex-row gap-2">
                   <button
+                    type="button"
                     onClick={handleTestDrive}
                     disabled={isTestingDrive}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     {isTestingDrive ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
                     <span>Kiểm tra Kết nối Drive</span>
@@ -2623,54 +4198,6 @@ export default function Admin() {
                     {driveTestStatus}
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* AI Model Tuning */}
-            <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Cấu hình Trí tuệ Nhân tạo Gemini</h3>
-                  <p className="text-[11px] text-slate-500">Mô hình phân tích, trích xuất và soạn thảo dự thảo</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Mô hình AI Ưu tiên</label>
-                  <select
-                    value={systemConfig.preferredAiModel}
-                    onChange={e => setSystemConfig({ ...systemConfig, preferredAiModel: e.target.value as any })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite (Siêu tốc & Tiết kiệm độ trễ - Khuyên dùng)</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Cân bằng tốc độ và phân tích sâu)</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Phân tích văn bản phức tạp & độ chính xác cao)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Cơ quan Trình mặc định trên Phiếu Trình</label>
-                  <input
-                    type="text"
-                    value={systemConfig.organizationName}
-                    onChange={e => setSystemConfig({ ...systemConfig, organizationName: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Chức danh người ký duyệt đề xuất</label>
-                  <input
-                    type="text"
-                    value={systemConfig.defaultSignerTitle}
-                    onChange={e => setSystemConfig({ ...systemConfig, defaultSignerTitle: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
               </div>
             </div>
           </div>

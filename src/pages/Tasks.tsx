@@ -4,14 +4,22 @@ import { db } from '../lib/firebase';
 import { 
   Loader2, FileText, CheckCircle2, Clock, Play, Building2, 
   Search, Filter, AlertTriangle, X, Plus, Download, Calendar, 
-  Check, Layers, ChevronRight, Sparkles
+  Check, Layers, ChevronRight, Sparkles, BarChart3, CheckSquare
 } from 'lucide-react';
 import { Task } from '../types';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useAuthStore } from '../store/authStore';
+import { useWardStore } from '../store/wardStore';
+import Statistics from './Statistics';
 
 export default function Tasks() {
   const { user } = useAuthStore();
+  const { getActiveWard, activeWardId } = useWardStore();
+  const activeWard = getActiveWard();
+  const location = useLocation();
+  const [activeMainTab, setActiveMainTab] = useState<'TASKS' | 'STATISTICS'>(
+    location.pathname === '/statistics' ? 'STATISTICS' : 'TASKS'
+  );
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN');
@@ -69,6 +77,8 @@ export default function Tasks() {
         dueDate: newDueDate || '',
         priority: newPriority,
         status: 'PENDING',
+        wardId: activeWard?.id || 'phu-cuong',
+        wardName: activeWard?.name || 'Đảng ủy Phường Phú Cường',
         createdBy: user?.uid || '',
         createdAt: serverTimestamp()
       });
@@ -88,14 +98,15 @@ export default function Tasks() {
   };
 
   const handleExportCsv = () => {
-    const headers = ["Số thứ tự", "Nhiệm vụ", "Nội dung chi tiết", "Đơn vị chủ trì / phụ trách", "Hạn xử lý", "Trạng thái"];
+    const headers = ["Số thứ tự", "Nhiệm vụ", "Nội dung chi tiết", "Đơn vị chủ trì / phụ trách", "Hạn xử lý", "Trạng thái", "Đơn vị/Phường"];
     const rows = filteredTasks.map((task, idx) => [
       idx + 1,
       `"${(task.title || '').replace(/"/g, '""')}"`,
       `"${(task.description || '').replace(/"/g, '""')}"`,
       `"${(task.assignedOrganization || '').replace(/"/g, '""')}"`,
       `"${task.dueDate || 'Không thời hạn'}"`,
-      `"${task.status === 'COMPLETED' ? 'Đã hoàn thành' : task.status === 'IN_PROGRESS' ? 'Đang thực hiện' : 'Chờ xử lý'}"`
+      `"${task.status === 'COMPLETED' ? 'Đã hoàn thành' : task.status === 'IN_PROGRESS' ? 'Đang thực hiện' : 'Chờ xử lý'}"`,
+      `"${task.wardName || 'N/A'}"`
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\r\n");
@@ -109,17 +120,22 @@ export default function Tasks() {
     document.body.removeChild(link);
   };
 
+  const visibleTasks = useMemo(() => {
+    if (activeWardId === 'all') return tasks;
+    return tasks.filter(t => !t.wardId || t.wardId === activeWardId);
+  }, [tasks, activeWardId]);
+
   const departments = useMemo(() => {
     const depts = new Set<string>();
-    tasks.forEach(t => {
+    visibleTasks.forEach(t => {
       if (t.assignedOrganization) depts.add(t.assignedOrganization);
     });
     return Array.from(depts);
-  }, [tasks]);
+  }, [visibleTasks]);
 
   const filteredTasks = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    return tasks.filter(task => {
+    return visibleTasks.filter(task => {
       if (selectedDept !== 'ALL' && task.assignedOrganization !== selectedDept) {
         return false;
       }
@@ -135,7 +151,7 @@ export default function Tasks() {
       }
       return true;
     });
-  }, [tasks, searchTerm, selectedDept, selectedPriority]);
+  }, [visibleTasks, searchTerm, selectedDept, selectedPriority]);
 
   const taskStats = useMemo(() => {
     let pending = 0;
@@ -144,7 +160,7 @@ export default function Tasks() {
     let overdue = 0;
     const now = new Date();
 
-    tasks.forEach(t => {
+    visibleTasks.forEach(t => {
       if (t.status === 'COMPLETED') {
         completed++;
       } else {
@@ -160,8 +176,8 @@ export default function Tasks() {
       }
     });
 
-    return { total: tasks.length, pending, inProgress, completed, overdue };
-  }, [tasks]);
+    return { total: visibleTasks.length, pending, inProgress, completed, overdue };
+  }, [visibleTasks]);
 
   const columns = useMemo(() => [
     { id: 'PENDING', title: 'Chờ phân công / xử lý', icon: Clock, color: 'border-slate-200 bg-slate-50/50', badgeColor: 'bg-slate-200 text-slate-700' },
@@ -189,7 +205,38 @@ export default function Tasks() {
 
   return (
     <div className="space-y-5 h-full flex flex-col font-sans transform-gpu">
-      {/* Header & Metrics with Google Studio Flowing Gradient Border */}
+      {/* Consolidated Navigation Tabs: Tasks vs Statistics */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/60 rounded-2xl border border-slate-300/70 w-fit">
+        <button
+          onClick={() => setActiveMainTab('TASKS')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeMainTab === 'TASKS'
+              ? 'bg-white text-blue-900 shadow-xs border border-slate-200 font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <CheckSquare className="w-4 h-4 text-blue-600" />
+          <span>Theo Dõi Nhiệm Vụ ({tasks.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('STATISTICS')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeMainTab === 'STATISTICS'
+              ? 'bg-blue-600 text-white shadow-xs font-extrabold'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Thống Kê Tiến Độ & Đôn Đốc Hạn Định</span>
+        </button>
+      </div>
+
+      {activeMainTab === 'STATISTICS' ? (
+        <Statistics />
+      ) : (
+        <>
+          {/* Header & Metrics with Google Studio Flowing Gradient Border */}
       <div className="space-y-4">
         <div className="google-studio-border google-studio-glow">
           <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 rounded-[calc(1.25rem-2px)] p-4 md:p-5 text-white shadow-lg shadow-blue-500/10">
@@ -590,6 +637,8 @@ export default function Tasks() {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

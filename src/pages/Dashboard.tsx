@@ -9,16 +9,19 @@ import { useNavigate, Link } from 'react-router';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db, getAccessToken, requestDriveAccess } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
+import { useWardStore } from '../store/wardStore';
 import { Document, Task } from '../types';
+import { isUrgentDocument, isDocumentCompleted } from '../lib/documentUtils';
 import { TaskReminderToasts, TaskReminderAlertBanner } from '../components/TaskReminderToasts';
 import ImportantDocumentsSection from '../components/ImportantDocumentsSection';
-import DocumentProgressChart from '../components/DocumentProgressChart';
+import BrainTrainingModal from '../components/BrainTrainingModal';
 import { getContributorProfile, DAILY_SCENARIOS_BANK } from '../lib/learningEngine';
 
 const TARGET_DRIVE_FOLDER_ID = '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
 const TARGET_DRIVE_FOLDER_URL = `https://drive.google.com/drive/folders/${TARGET_DRIVE_FOLDER_ID}`;
 
 export default function Dashboard() {
+  const [isBrainModalOpen, setIsBrainModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,8 @@ export default function Dashboard() {
   
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { getActiveWard, activeWardId } = useWardStore();
+  const activeWard = getActiveWard();
 
   useEffect(() => {
     let isMounted = true;
@@ -60,13 +65,24 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Filter documents and tasks according to active Ward selection
+  const visibleDocs = useMemo(() => {
+    if (activeWardId === 'all') return allDocs;
+    return allDocs.filter(d => !d.wardId || d.wardId === activeWardId);
+  }, [allDocs, activeWardId]);
+
+  const visibleTasks = useMemo(() => {
+    if (activeWardId === 'all') return allTasks;
+    return allTasks.filter(t => !t.wardId || t.wardId === activeWardId);
+  }, [allTasks, activeWardId]);
+
   const stats = useMemo(() => {
     let urgent = 0;
     let standingBoard = 0;
     let driveCount = 0;
 
-    for (const doc of allDocs) {
-      if (doc.urgency && doc.urgency !== 'Thường') urgent++;
+    for (const doc of visibleDocs) {
+      if (isUrgentDocument(doc)) urgent++;
       if (doc.proposedAction && (doc.proposedAction.includes('Ban Thường vụ') || doc.proposedAction.includes('Thường trực'))) {
         standingBoard++;
       }
@@ -78,25 +94,25 @@ export default function Dashboard() {
     let pending = 0;
     let completed = 0;
 
-    for (const task of allTasks) {
+    for (const task of visibleTasks) {
       if (task.status === 'COMPLETED') completed++;
       else pending++;
     }
 
     return {
-      totalDocs: allDocs.length,
+      totalDocs: visibleDocs.length,
       urgentDocs: urgent,
       standingBoardDocs: standingBoard,
       driveSyncedDocs: driveCount,
       pendingTasks: pending,
       completedTasks: completed,
     };
-  }, [allDocs, allTasks]);
+  }, [visibleDocs, visibleTasks]);
 
   const [recentDocFilter, setRecentDocFilter] = useState<'ALL' | 'STANDING_BOARD' | 'URGENT' | 'DRIVE'>('ALL');
 
   const filteredRecentDocs = useMemo(() => {
-    let filtered = allDocs;
+    let filtered = visibleDocs;
     if (recentDocFilter === 'STANDING_BOARD') {
       filtered = filtered.filter(d => d.proposedAction?.includes('Ban Thường vụ') || d.proposedAction?.includes('Thường trực'));
     } else if (recentDocFilter === 'URGENT') {
@@ -105,9 +121,9 @@ export default function Dashboard() {
       filtered = filtered.filter(d => d.driveFileId || d.driveUrl);
     }
     return filtered.slice(0, 7);
-  }, [allDocs, recentDocFilter]);
+  }, [visibleDocs, recentDocFilter]);
 
-  const recentTasks = useMemo(() => allTasks.slice(0, 5), [allTasks]);
+  const recentTasks = useMemo(() => visibleTasks.slice(0, 5), [visibleTasks]);
 
   const handleConnectDrive = useCallback(async () => {
     setIsConnectingDrive(true);
@@ -178,6 +194,8 @@ export default function Dashboard() {
 
       const docRef = await addDoc(collection(db, 'documents'), {
         ...data.analysis,
+        wardId: activeWard?.id || 'phu-cuong',
+        wardName: activeWard?.name || 'Đảng ủy Phường Phú Cường',
         driveFileId: data.driveFileId || null,
         driveUrl: data.driveUrl || (data.driveFileId ? `https://drive.google.com/file/d/${data.driveFileId}/view` : null),
         driveFolderId: data.driveFolderId || customFolderId || TARGET_DRIVE_FOLDER_ID,
@@ -201,7 +219,7 @@ export default function Dashboard() {
       setIsUploading(false);
       setUploadStep('');
     }
-  }, [navigate, user, customFolderId]);
+  }, [navigate, user, customFolderId, activeWard]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
@@ -339,34 +357,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* DAILY SCENARIO LEARNING & GOOGLE MAPS REVIEW WIDGET */}
+      {/* HUẤN LUYỆN BỘ NÃO AI CẤP UỶ WIDGET */}
       <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 rounded-3xl p-6 border border-amber-200 shadow-sm relative overflow-hidden">
         <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-amber-200/60">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md">
-              <Award className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+              <Brain className="w-6 h-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-md uppercase">
-                  Tình huống Tham mưu Hôm nay
+                <span className="px-2.5 py-0.5 bg-amber-600 text-white text-[10px] font-black rounded-md uppercase tracking-wider">
+                  Huấn Luyện AI
                 </span>
-                <span className="text-[11px] font-bold text-amber-900">
-                  Google Maps Style AI Training
+                <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-600" />
+                  Cấp ủy Smart Learning
                 </span>
               </div>
               <h3 className="text-base font-black text-slate-900 mt-0.5">
-                Rèn Luyện Não AI: {DAILY_SCENARIOS_BANK[0].title}
+                Huấn Luyện AI: {DAILY_SCENARIOS_BANK[0].title}
               </h3>
             </div>
           </div>
 
           <button
-            onClick={() => navigate('/ai-assistant')}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black inline-flex items-center gap-2 shadow-md transition-all cursor-pointer hover:scale-102"
+            onClick={() => setIsBrainModalOpen(true)}
+            className="px-5 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-2xl text-xs font-black inline-flex items-center gap-2.5 shadow-lg shadow-amber-500/25 transition-all cursor-pointer hover:scale-102 active:scale-95"
           >
-            <Star className="w-4 h-4 fill-white" />
-            <span>Đánh Giá & Luyện Não AI (+25 Điểm)</span>
+            <Brain className="w-4 h-4 text-amber-100" />
+            <span>Huấn luyện AI</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -374,25 +393,36 @@ export default function Dashboard() {
         <div className="pt-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
           <div className="md:col-span-8 text-xs text-slate-700 font-medium leading-relaxed">
             <p className="line-clamp-2">
-              <strong>Bối cảnh:</strong> {DAILY_SCENARIOS_BANK[0].background}
+              <strong>Bối cảnh tình huống:</strong> {DAILY_SCENARIOS_BANK[0].background}
             </p>
             <p className="text-[11px] text-blue-900 font-bold mt-1">
-              🎯 Thẩm quyền: {DAILY_SCENARIOS_BANK[0].defaultAiAdvice.authority}
+              🎯 Thẩm quyền tham mưu: {DAILY_SCENARIOS_BANK[0].defaultAiAdvice.authority}
             </p>
           </div>
 
-          <div className="md:col-span-4 bg-white/80 backdrop-blur-xs p-3 rounded-2xl border border-amber-200/80 flex items-center justify-between">
+          <div 
+            onClick={() => setIsBrainModalOpen(true)}
+            className="md:col-span-4 bg-white/90 backdrop-blur-xs p-3.5 rounded-2xl border border-amber-200 shadow-xs hover:border-amber-400 cursor-pointer transition-all flex items-center justify-between group"
+          >
             <div className="space-y-0.5">
-              <div className="text-[10px] font-bold text-slate-500 uppercase">Huy hiệu Chuyên gia</div>
-              <div className="text-xs font-black text-amber-950">Cấp 3: Cán bộ Nòng cốt</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase">Trạng thái Bộ Não AI</div>
+              <div className="text-xs font-black text-amber-950 group-hover:text-amber-600 transition-colors">
+                Bấm vào đây để Huấn Luyện 👉
+              </div>
             </div>
             <div className="text-right">
               <div className="text-sm font-black text-emerald-600">98.5%</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase">Độ chuẩn xác AI</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">Độ chuẩn xác</div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Interactive Brain Training Modal */}
+      <BrainTrainingModal 
+        isOpen={isBrainModalOpen}
+        onClose={() => setIsBrainModalOpen(false)}
+      />
 
       {/* Featured Important User-Uploaded Documents Section */}
       <ImportantDocumentsSection 
@@ -404,9 +434,6 @@ export default function Dashboard() {
           }
         }}
       />
-
-      {/* Recharts-Powered Comprehensive Document Workflow & Deadline Statistics Chart */}
-      <DocumentProgressChart documents={allDocs} tasks={allTasks} />
 
       {/* Main Grid: Upload & Recent Dispatches */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

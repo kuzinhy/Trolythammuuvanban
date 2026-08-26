@@ -462,7 +462,16 @@ app.post('/api/drive/sync-file', upload.single('file'), async (req, res) => {
     if (result.driveFileId) {
       res.json({ success: true, ...result });
     } else {
-      res.status(500).json({ error: result.driveError || 'Tải lên Google Drive thất bại' });
+      const isAuthError = result.driveError && (
+        result.driveError.includes('401') || 
+        result.driveError.includes('authError') || 
+        result.driveError.includes('UNAUTHENTICATED') ||
+        result.driveError.includes('invalid authentication credentials')
+      );
+      res.status(isAuthError ? 401 : 500).json({ 
+        error: isAuthError ? 'Phiên làm việc Google Drive đã hết hạn. Vui lòng cấp lại quyền truy cập.' : (result.driveError || 'Tải lên Google Drive thất bại'),
+        isAuthError: !!isAuthError
+      });
     }
   } catch (err: any) {
     console.error('Drive manual sync error:', err);
@@ -653,7 +662,7 @@ const DRIVE_FOLDER_DIGITIZED_KNOWLEDGE = {
 // General Chat / Advice endpoint with Advanced Reasoning & Grounding
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, messages, contextDocs, referenceDocs, tasks, brainBlueprint, contextDocument, roleContext, learnedRules, trainingDatasets } = req.body;
+    const { message, messages, contextDocs, referenceDocs, tasks, brainBlueprint, contextDocument, roleContext, learnedRules, trainingDatasets, userPreferencesContext } = req.body;
     let promptText = '';
 
     const formattingRule = `
@@ -688,6 +697,10 @@ YÊU CẦU ĐỊNH DẠNG & VĂN PHONG THAM MƯU (BẮT BUỘC):
         trainingDatasets.slice(0, 8).map((td: any, idx: number) => 
           `[Mẫu ${idx + 1}] Tình huống: "${td.scenarioTitle}"\n- Bối cảnh: ${td.scenarioContext || 'N/A'}\n- Lời giải mẫu chuẩn mực: ${td.expertCompletion}\n- Thẩm quyền: ${td.authorityRouting || 'BTV Đảng ủy cho chủ trương'}`
         ).join('\n\n');
+    }
+
+    if (userPreferencesContext) {
+      knowledgeContext += userPreferencesContext;
     }
 
     if (referenceDocs && Array.isArray(referenceDocs) && referenceDocs.length > 0) {

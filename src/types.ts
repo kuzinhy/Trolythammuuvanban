@@ -1,10 +1,62 @@
+export interface WardUnit {
+  id: string; // e.g. 'phu-cuong', 'hiep-thanh', 'phu-hoa', 'chanh-nghia'
+  code: string; // e.g. 'PHU_CUONG', 'HIEP_THANH'
+  name: string; // e.g. 'Đảng ủy Phường Phú Cường'
+  shortName: string; // e.g. 'Phường Phú Cường'
+  parentOrg: string; // e.g. 'Thành ủy Thủ Dầu Một'
+  districtName: string; // e.g. 'Thành phố Thủ Dầu Một'
+  provinceName: string; // e.g. 'Tỉnh Bình Dương'
+  officeAddress: string;
+  contactPhone: string;
+  contactEmail: string;
+  technicalSupportContact?: string;
+  defaultSignerTitle: string; // e.g. 'Bí thư Đảng ủy Phường'
+  driveFolderId?: string;
+  driveFolderName?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  isActive?: boolean;
+  adminEmails: string[]; // Danh sách email quản trị viên của phường này
+  createdAt?: string;
+  stats?: {
+    totalDocuments?: number;
+    totalTasks?: number;
+    totalOfficers?: number;
+  };
+}
+
 export interface User {
   uid: string;
   email: string;
   displayName: string | null;
-  role: 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER';
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER';
+  wardId?: string; // ID đơn vị/phường trực thuộc
+  wardName?: string; // Tên đơn vị/phường trực thuộc
   department?: string;
   isActive?: boolean;
+}
+
+export interface UserPermissionProfile {
+  uid: string;
+  name: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER';
+  roleTitle: string; // VD: Bí thư Đảng ủy, Phó Bí thư Thường trực, Chánh VP Cấp ủy...
+  department: string; // VD: Văn phòng Đảng ủy, Ban Tổ chức, Chi bộ Khu phố 1...
+  wardId?: string; // ID phường/đơn vị (hoặc 'all' cho SuperAdmin)
+  wardName?: string; // Tên phường/đơn vị
+  status: 'ACTIVE' | 'LOCKED' | 'PENDING';
+  phone?: string;
+  permissions: {
+    viewSecretDocs: boolean; // Xem văn bản Mật / Nội bộ Cấp ủy
+    approveDrafts: boolean; // Phê duyệt dự thảo & Ký số Phiếu Tham mưu
+    trainAI: boolean; // Huấn luyện & Nạp tri thức Bộ não AI
+    manageSchedule: boolean; // Phê duyệt Lịch công tác Thường trực
+    assignTasks: boolean; // Giao & Đôn đốc nhiệm vụ Chi bộ / Ban ngành
+    systemAdmin: boolean; // Quản trị hệ thống & Cấu hình CSDL
+    exportReports: boolean; // Xuất báo cáo thống kê định kỳ
+    auditDocumentFormat: boolean; // Rà soát thể thức văn bản Đảng
+  };
+  lastActiveAt?: string;
 }
 
 export interface DepartmentConfig {
@@ -16,6 +68,7 @@ export interface DepartmentConfig {
   email?: string;
   keywords: string[];
   isDefaultLead?: boolean;
+  wardId?: string;
 }
 
 export interface RoutingRule {
@@ -29,6 +82,7 @@ export interface RoutingRule {
   ruleName?: string;
   department?: string;
   keywords?: string[];
+  wardId?: string;
 }
 
 export interface LegalBasisItem {
@@ -56,11 +110,33 @@ export interface AppConnectionConfig {
 }
 
 export interface SystemConfig {
+  wardId?: string; // ID đơn vị phường liên kết
+  // Ward Administrative Entity Metadata
+  wardName?: string; // VD: "Đảng ủy Phường Phú Cường"
+  districtName?: string; // VD: "Thành phố Thủ Dầu Một"
+  provinceName?: string; // VD: "Tỉnh Bình Dương"
+  parentOrganization?: string; // VD: "Thành ủy Thủ Dầu Một"
+  officeAddress?: string; // VD: "Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường"
+  contactPhone?: string; // VD: "0274 3822 123"
+  contactEmail?: string; // VD: "vanphong.danguy@phucuong.gov.vn"
+  technicalSupportContact?: string; // VD: "Đ/c Nguyễn Huy - Chuyên viên CNTT (0912.345.678)"
+
+  // Document Priority & Processing Rules
+  normalDocDeadlineDays?: number; // Mặc định 3 ngày
+  urgentDocDeadlineHours?: number; // Mặc định 24 giờ
+  superUrgentDocDeadlineHours?: number; // Mặc định 4 giờ
+  reminderBeforeHours?: number; // Nhắc trước 12 giờ
+  autoAssignEnabled?: boolean; // Tự động gợi ý phân luồng
+  strictSecretMode?: boolean; // Kiểm soát nghiêm ngặt văn bản mật
+
+  // Storage & Cloud Sync
   defaultDriveFolderId: string;
   defaultDriveFolderName: string;
+  enableDriveAutoUpload: boolean;
+
+  // AI & Drafting Configuration
   preferredAiModel: 'gemini-3.1-flash-lite' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
   autoExtractTasksOnUpload: boolean;
-  enableDriveAutoUpload: boolean;
   defaultSignerTitle: string;
   organizationName: string;
   connectedApp?: AppConnectionConfig;
@@ -129,6 +205,7 @@ export interface Document {
   tags?: string[];
   assignedDeputyChief?: string | null; // Giao cho Phó Chánh VP nào
   processingResult?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE' | string | null; // Kết quả: xong chưa, hay đang thực hiện
+  isProcessed?: boolean;
 
   status: 'UPLOADED' | 'ANALYZED' | 'USER_REVIEWED' | 'USER_CONFIRMED' | 'DISPATCHED';
   createdBy?: string;
@@ -138,6 +215,8 @@ export interface Document {
   referenceCategory?: string;
   uploadedByName?: string;
   uploadedByEmail?: string;
+  wardId?: string; // ID Đơn vị / Phường
+  wardName?: string; // Tên Đơn vị / Phường
 }
 
 export interface AssignedOfficer {
@@ -148,6 +227,7 @@ export interface AssignedOfficer {
   phone?: string;
   email?: string;
   status: 'ACTIVE' | 'BUSY' | 'ON_LEAVE';
+  wardId?: string; // ID Đơn vị / Phường
 }
 
 export interface Task {
@@ -174,5 +254,7 @@ export interface Task {
   aiReasoningSummary?: string | null;
   approvalStatus?: 'PENDING' | 'CONFIRMED' | 'REJECTED';
   createdAt?: any;
+  wardId?: string; // ID Đơn vị / Phường
+  wardName?: string; // Tên Đơn vị / Phường
 }
 
