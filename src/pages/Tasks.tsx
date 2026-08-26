@@ -77,8 +77,8 @@ export default function Tasks() {
         dueDate: newDueDate || '',
         priority: newPriority,
         status: 'PENDING',
-        wardId: activeWard?.id || 'phu-cuong',
-        wardName: activeWard?.name || 'Đảng ủy Phường Phú Cường',
+        wardId: activeWard?.id || 'thu-dau-mot',
+        wardName: activeWard?.name || 'Đảng ủy Phường Thủ Dầu Một',
         createdBy: user?.uid || '',
         createdAt: serverTimestamp()
       });

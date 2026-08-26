@@ -319,7 +319,7 @@ export const DEFAULT_LEARNED_RULES: LearningRule[] = [
     confidence: 94,
     useCount: 11,
     isActive: true,
-    notes: 'Học từ đề án chuyển đổi số phường Phú Cường - Thủ Dầu Một'
+    notes: 'Học từ đề án chuyển đổi số phường Thủ Dầu Một'
   }
 ];
 

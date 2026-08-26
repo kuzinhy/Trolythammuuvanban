@@ -298,6 +298,62 @@ export default function Layout() {
             </NavLink>
           </div>
         </nav>
+
+        {/* Bottom Left Personal User Menu Trigger */}
+        <div className="p-3 border-t border-blue-100/80 bg-gradient-to-b from-white to-blue-50/50 flex-shrink-0">
+          <button
+            onClick={() => setShowUserMenu(prev => !prev)}
+            className={cn(
+              "w-full flex items-center gap-2.5 p-2 rounded-2xl border transition-all cursor-pointer group shadow-2xs text-left",
+              showUserMenu
+                ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-400/30 shadow-md"
+                : "bg-white hover:bg-blue-50/80 border-slate-200/90 text-slate-800"
+            )}
+            title="Mở Menu Cá nhân & Quản trị Cấp ủy"
+          >
+            <div className="relative flex-shrink-0">
+              <div className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black uppercase shadow-xs transition-colors",
+                showUserMenu 
+                  ? "bg-white text-blue-700 border border-blue-200" 
+                  : "bg-gradient-to-br from-blue-600 to-indigo-600 text-white border border-blue-300"
+              )}>
+                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'A'}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className={cn(
+                  "text-xs font-bold truncate",
+                  showUserMenu ? "text-white" : "text-slate-900"
+                )}>
+                  {user?.displayName || user?.email?.split('@')[0]}
+                </span>
+                {isAdmin && (
+                  <span className={cn(
+                    "px-1 py-0.2 text-[8px] font-black rounded flex-shrink-0",
+                    showUserMenu ? "bg-white text-blue-800" : "bg-blue-600 text-white"
+                  )}>
+                    AD
+                  </span>
+                )}
+              </div>
+              <p className={cn(
+                "text-[10px] font-medium truncate mt-0.5",
+                showUserMenu ? "text-blue-100" : "text-blue-600"
+              )}>
+                {user?.email || 'Chuyên viên Cấp ủy'}
+              </p>
+            </div>
+
+            <ChevronDown className={cn(
+              "w-4 h-4 transition-transform duration-200 flex-shrink-0",
+              showUserMenu ? "rotate-180 text-white" : "text-slate-400"
+            )} />
+          </button>
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -478,35 +534,23 @@ export default function Layout() {
               <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </a>
 
-            {/* User Profile & Admin Menu Trigger Button */}
+            {/* Mobile User Profile & Admin Menu Trigger Button */}
             <button
               onClick={() => setShowUserMenu(prev => !prev)}
               className={cn(
-                "flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-2xl border transition-all cursor-pointer group shadow-2xs",
+                "md:hidden flex items-center gap-1.5 p-1 rounded-xl border transition-all cursor-pointer group shadow-2xs",
                 showUserMenu
-                  ? "bg-blue-50 border-blue-300 ring-2 ring-blue-500/20 text-blue-900"
+                  ? "bg-blue-50 border-blue-300 text-blue-900"
                   : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
               )}
-              title="Mở Menu Người dùng & Quản trị Cấp ủy"
+              title="Mở Menu Cá nhân & Quản trị"
             >
               <div className="relative">
-                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-300 flex items-center justify-center text-[11px] font-black text-white uppercase shadow-xs">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-300 flex items-center justify-center text-[11px] font-black text-white uppercase shadow-xs">
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'A'}
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-white rounded-full" />
               </div>
-
-              <div className="hidden sm:flex flex-col items-start text-left">
-                <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 leading-tight">
-                  <span className="truncate max-w-[110px]">{user?.displayName || user?.email?.split('@')[0]}</span>
-                  {isAdmin && (
-                    <span className="px-1 py-0.2 bg-blue-600 text-white text-[8px] font-black rounded">AD</span>
-                  )}
-                </div>
-                <span className="text-[9px] text-blue-600 font-extrabold tracking-tight">Menu Quản trị</span>
-              </div>
-
-              <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-200", showUserMenu && "rotate-180 text-blue-600")} />
             </button>
           </div>
         </header>

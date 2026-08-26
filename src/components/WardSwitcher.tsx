@@ -67,7 +67,7 @@ export default function WardSwitcher() {
         <div className="flex flex-col items-start text-left max-w-[140px] sm:max-w-[200px] md:max-w-[240px]">
           <div className="flex items-center gap-1.5 w-full">
             <span className="text-[11px] font-black text-slate-900 truncate leading-tight">
-              {activeWard?.shortName || activeWard?.name || 'Đảng ủy Phường Phú Cường'}
+              {activeWard?.shortName || activeWard?.name || 'Đảng ủy Phường Thủ Dầu Một'}
             </span>
             {isSuper ? (
               <span className="px-1.5 py-0.2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[8px] font-black uppercase rounded shadow-xs">

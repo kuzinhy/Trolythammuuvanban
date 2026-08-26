@@ -151,8 +151,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'LEADER',
     roleTitle: 'Bí thư Đảng ủy Phường',
     department: 'Thường trực Đảng ủy',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988123456',
     permissions: {
@@ -174,8 +174,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'LEADER',
     roleTitle: 'Phó Bí thư Thường trực Đảng ủy',
     department: 'Thường trực Đảng ủy',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988234567',
     permissions: {
@@ -197,8 +197,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'LEADER',
     roleTitle: 'Phó Bí thư - Chủ tịch UBND Phường',
     department: 'HĐND & UBND Phường',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988345678',
     permissions: {
@@ -220,8 +220,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'OFFICE',
     roleTitle: 'Chuyên viên Tổng hợp Cấp ủy',
     department: 'Văn phòng Đảng ủy Phường',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988456789',
     permissions: {
@@ -243,8 +243,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'STAFF',
     roleTitle: 'Cán bộ Văn thư - Lưu trữ',
     department: 'Bộ phận Văn thư Cấp ủy',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988567890',
     permissions: {
@@ -266,8 +266,8 @@ const INITIAL_USER_PERMISSIONS: UserPermissionProfile[] = [
     role: 'STAFF',
     roleTitle: 'Bí thư Chi bộ Khu phố 1',
     department: 'Chi bộ Khu phố 1',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     status: 'ACTIVE',
     phone: '0988678901',
     permissions: {
@@ -320,8 +320,8 @@ export default function Admin() {
     role: 'OFFICE' as 'ADMIN' | 'LEADER' | 'OFFICE' | 'STAFF' | 'VIEWER',
     roleTitle: 'Chuyên viên Văn phòng',
     department: 'Văn phòng Đảng ủy Phường',
-    wardId: 'phu-cuong',
-    wardName: 'Đảng ủy Phường Phú Cường',
+    wardId: 'thu-dau-mot',
+    wardName: 'Đảng ủy Phường Thủ Dầu Một',
     phone: '',
     permissions: {
       viewSecretDocs: true,
@@ -393,8 +393,8 @@ export default function Admin() {
       role: 'OFFICE',
       roleTitle: 'Chuyên viên Văn phòng',
       department: 'Văn phòng Đảng ủy Phường',
-      wardId: 'phu-cuong',
-      wardName: 'Đảng ủy Phường Phú Cường',
+      wardId: 'thu-dau-mot',
+      wardName: 'Đảng ủy Phường Thủ Dầu Một',
       phone: '',
       permissions: {
         viewSecretDocs: true,
@@ -512,13 +512,13 @@ export default function Admin() {
     const parsed = saved ? JSON.parse(saved) : {};
     return {
       // Ward Metadata
-      wardName: parsed.wardName || 'Đảng ủy Phường Phú Cường',
+      wardName: parsed.wardName || 'Đảng ủy Phường Thủ Dầu Một',
       districtName: parsed.districtName || 'Thành phố Thủ Dầu Một',
       provinceName: parsed.provinceName || 'Tỉnh Bình Dương',
       parentOrganization: parsed.parentOrganization || 'Thành ủy Thủ Dầu Một',
-      officeAddress: parsed.officeAddress || 'Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một',
+      officeAddress: parsed.officeAddress || 'Số 01 Đường Cách Mạng Tháng Tám, Phường Thủ Dầu Một, TP. Thủ Dầu Một',
       contactPhone: parsed.contactPhone || '0274 3822 123',
-      contactEmail: parsed.contactEmail || 'vanphong.danguy@phucuong.gov.vn',
+      contactEmail: parsed.contactEmail || 'vanphong.danguy@thudaumot.gov.vn',
       technicalSupportContact: parsed.technicalSupportContact || 'Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (SĐT: 0912.345.678)',
 
       // Processing Priority Rules
@@ -536,7 +536,7 @@ export default function Admin() {
       autoExtractTasksOnUpload: parsed.autoExtractTasksOnUpload ?? true,
       enableDriveAutoUpload: parsed.enableDriveAutoUpload ?? true,
       defaultSignerTitle: parsed.defaultSignerTitle || 'Bí thư Đảng ủy Phường',
-      organizationName: parsed.organizationName || 'Đảng ủy - HĐND - UBND Phường Phú Cường',
+      organizationName: parsed.organizationName || 'Đảng ủy - HĐND - UBND Phường Thủ Dầu Một',
       connectedApp: parsed.connectedApp || DEFAULT_APP_CONNECTION
     };
   });
@@ -2157,14 +2157,14 @@ export default function Admin() {
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Đơn vị Hành chính quản lý (Phường/Xã)</label>
                 <select
-                  value={newUserProfile.wardId || 'phu-cuong'}
+                  value={newUserProfile.wardId || 'thu-dau-mot'}
                   onChange={(e) => {
                     const selectedWardId = e.target.value;
                     const selectedWard = wards.find(w => w.id === selectedWardId);
                     setNewUserProfile({
                       ...newUserProfile,
                       wardId: selectedWardId,
-                      wardName: selectedWard ? selectedWard.name : 'Đảng ủy Phường Phú Cường'
+                      wardName: selectedWard ? selectedWard.name : 'Đảng ủy Phường Thủ Dầu Một'
                     });
                   }}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-900 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -3798,7 +3798,7 @@ export default function Admin() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base font-black text-slate-900">Cấu hình Đơn vị Phường & Tham số Vận hành Cấp ủy</h2>
                   <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-extrabold uppercase tracking-wide">
-                    Chuẩn hóa Phường Phú Cường
+                    Chuẩn hóa Phường Thủ Dầu Một
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
@@ -3813,14 +3813,14 @@ export default function Admin() {
                 onClick={() => {
                   setSystemConfig({
                     ...systemConfig,
-                    wardName: 'Đảng ủy Phường Phú Cường',
-                    organizationName: 'Đảng ủy - HĐND - UBND Phường Phú Cường',
+                    wardName: 'Đảng ủy Phường Thủ Dầu Một',
+                    organizationName: 'Đảng ủy - HĐND - UBND Phường Thủ Dầu Một',
                     parentOrganization: 'Thành ủy Thủ Dầu Một',
                     provinceName: 'Tỉnh Bình Dương',
                     districtName: 'Thành phố Thủ Dầu Một',
-                    officeAddress: 'Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một',
+                    officeAddress: 'Số 01 Đường Cách Mạng Tháng Tám, Phường Thủ Dầu Một, TP. Thủ Dầu Một',
                     contactPhone: '0274 3822 123',
-                    contactEmail: 'vanphong.danguy@phucuong.gov.vn',
+                    contactEmail: 'vanphong.danguy@thudaumot.gov.vn',
                     technicalSupportContact: 'Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (SĐT: 0912.345.678)',
                     normalDocDeadlineDays: 3,
                     urgentDocDeadlineHours: 24,
@@ -3832,7 +3832,7 @@ export default function Admin() {
                   });
                 }}
                 className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Tải lại giá trị mặc định chuẩn Phường Phú Cường"
+                title="Tải lại giá trị mặc định chuẩn Phường Thủ Dầu Một"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Nạp Mẫu Chuẩn Phường</span>

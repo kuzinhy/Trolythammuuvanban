@@ -201,8 +201,8 @@ export default function Dashboard() {
 
       const docRef = await addDoc(collection(db, 'documents'), {
         ...data.analysis,
-        wardId: activeWard?.id || 'phu-cuong',
-        wardName: activeWard?.name || 'Đảng ủy Phường Phú Cường',
+        wardId: activeWard?.id || 'thu-dau-mot',
+        wardName: activeWard?.name || 'Đảng ủy Phường Thủ Dầu Một',
         driveFileId: data.driveFileId || null,
         driveUrl: data.driveUrl || (data.driveFileId ? `https://drive.google.com/file/d/${data.driveFileId}/view` : null),
         driveFolderId: data.driveFolderId || customFolderId || TARGET_DRIVE_FOLDER_ID,

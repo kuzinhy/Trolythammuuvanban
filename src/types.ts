@@ -1,8 +1,8 @@
 export interface WardUnit {
-  id: string; // e.g. 'phu-cuong', 'hiep-thanh', 'phu-hoa', 'chanh-nghia'
-  code: string; // e.g. 'PHU_CUONG', 'HIEP_THANH'
-  name: string; // e.g. 'Đảng ủy Phường Phú Cường'
-  shortName: string; // e.g. 'Phường Phú Cường'
+  id: string; // e.g. 'thu-dau-mot'
+  code: string; // e.g. 'THU_DAU_MOT'
+  name: string; // e.g. 'Đảng ủy Phường Thủ Dầu Một'
+  shortName: string; // e.g. 'Phường Thủ Dầu Một'
   parentOrg: string; // e.g. 'Thành ủy Thủ Dầu Một'
   districtName: string; // e.g. 'Thành phố Thủ Dầu Một'
   provinceName: string; // e.g. 'Tỉnh Bình Dương'

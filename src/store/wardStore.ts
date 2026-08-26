@@ -3,177 +3,27 @@ import { WardUnit, User } from '../types';
 
 export const INITIAL_WARDS: WardUnit[] = [
   {
-    id: 'phu-cuong',
-    code: 'PHU_CUONG',
-    name: 'Đảng ủy Phường Phú Cường',
-    shortName: 'Phường Phú Cường',
+    id: 'thu-dau-mot',
+    code: 'THU_DAU_MOT',
+    name: 'Đảng ủy Phường Thủ Dầu Một',
+    shortName: 'Phường Thủ Dầu Một',
     parentOrg: 'Thành ủy Thủ Dầu Một',
     districtName: 'Thành phố Thủ Dầu Một',
     provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Số 01 Đường Cách Mạng Tháng Tám, Phường Phú Cường, TP. Thủ Dầu Một',
+    officeAddress: 'Số 01 Đường Cách Mạng Tháng Tám, Phường Thủ Dầu Một, TP. Thủ Dầu Một',
     contactPhone: '0274 3822 123',
-    contactEmail: 'vanphong.danguy@phucuong.gov.vn',
+    contactEmail: 'vanphong.danguy@thudaumot.gov.vn',
     technicalSupportContact: 'Đ/c Nguyễn Huy - Chuyên viên CNTT & Quản trị Hệ thống (0912.345.678)',
     defaultSignerTitle: 'Bí thư Đảng ủy Phường',
     driveFolderId: '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR',
-    driveFolderName: 'Hồ sơ lưu trữ Văn bản Tham mưu - Phường Phú Cường',
+    driveFolderName: 'Hồ sơ lưu trữ Văn bản Tham mưu - Phường Thủ Dầu Một',
     status: 'ACTIVE',
-    adminEmails: ['nguyenhuy.thudaumot@gmail.com', 'admin.phucuong@phuong.gov.vn'],
+    adminEmails: ['nguyenhuy.thudaumot@gmail.com', 'admin.thudaumot@phuong.gov.vn'],
     createdAt: '2025-01-01',
     stats: {
       totalDocuments: 142,
       totalTasks: 48,
       totalOfficers: 12
-    }
-  },
-  {
-    id: 'hiep-thanh',
-    code: 'HIEP_THANH',
-    name: 'Đảng ủy Phường Hiệp Thành',
-    shortName: 'Phường Hiệp Thành',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Yersin, Phường Hiệp Thành, TP. Thủ Dầu Một',
-    contactPhone: '0274 3824 567',
-    contactEmail: 'vanphong.danguy@hiepthanh.gov.vn',
-    technicalSupportContact: 'Bộ phận CNTT Thành ủy Thủ Dầu Một',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    driveFolderId: '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR',
-    driveFolderName: 'Hồ sơ lưu trữ Văn bản Tham mưu - Phường Hiệp Thành',
-    status: 'ACTIVE',
-    adminEmails: ['admin.hiepthanh@phuong.gov.vn'],
-    createdAt: '2025-01-05',
-    stats: {
-      totalDocuments: 98,
-      totalTasks: 32,
-      totalOfficers: 10
-    }
-  },
-  {
-    id: 'phu-hoa',
-    code: 'PHU_HOA',
-    name: 'Đảng ủy Phường Phú Hòa',
-    shortName: 'Phường Phú Hòa',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường 30/4, Phường Phú Hòa, TP. Thủ Dầu Một',
-    contactPhone: '0274 3831 234',
-    contactEmail: 'vanphong.danguy@phuhoa.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.phuhoa@phuong.gov.vn'],
-    createdAt: '2025-01-10',
-    stats: {
-      totalDocuments: 115,
-      totalTasks: 41,
-      totalOfficers: 11
-    }
-  },
-  {
-    id: 'chanh-nghia',
-    code: 'CHANH_NGHIA',
-    name: 'Đảng ủy Phường Chánh Nghĩa',
-    shortName: 'Phường Chánh Nghĩa',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Bùi Quốc Khánh, Phường Chánh Nghĩa, TP. Thủ Dầu Một',
-    contactPhone: '0274 3823 888',
-    contactEmail: 'vanphong.danguy@chanhnghia.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.chanhnghia@phuong.gov.vn'],
-    createdAt: '2025-01-12',
-    stats: {
-      totalDocuments: 86,
-      totalTasks: 27,
-      totalOfficers: 9
-    }
-  },
-  {
-    id: 'phu-loi',
-    code: 'PHU_LOI',
-    name: 'Đảng ủy Phường Phú Lợi',
-    shortName: 'Phường Phú Lợi',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Huỳnh Văn Lũy, Phường Phú Lợi, TP. Thủ Dầu Một',
-    contactPhone: '0274 3825 999',
-    contactEmail: 'vanphong.danguy@phuloi.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.phuloi@phuong.gov.vn'],
-    createdAt: '2025-01-15',
-    stats: {
-      totalDocuments: 104,
-      totalTasks: 35,
-      totalOfficers: 10
-    }
-  },
-  {
-    id: 'dinh-hoa',
-    code: 'DINH_HOA',
-    name: 'Đảng ủy Phường Định Hòa',
-    shortName: 'Phường Định Hòa',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Quốc lộ 13, Phường Định Hòa, TP. Thủ Dầu Một',
-    contactPhone: '0274 3866 112',
-    contactEmail: 'vanphong.danguy@dinhhoa.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.dinhhoa@phuong.gov.vn'],
-    createdAt: '2025-01-20',
-    stats: {
-      totalDocuments: 75,
-      totalTasks: 22,
-      totalOfficers: 8
-    }
-  },
-  {
-    id: 'tan-an',
-    code: 'TAN_AN',
-    name: 'Đảng ủy Phường Tân An',
-    shortName: 'Phường Tân An',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Nguyễn Chí Thanh, Phường Tân An, TP. Thủ Dầu Một',
-    contactPhone: '0274 3861 234',
-    contactEmail: 'vanphong.danguy@tanan.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.tanan@phuong.gov.vn'],
-    createdAt: '2025-01-22',
-    stats: {
-      totalDocuments: 62,
-      totalTasks: 19,
-      totalOfficers: 8
-    }
-  },
-  {
-    id: 'tuong-binh-hiep',
-    code: 'TUONG_BINH_HIEP',
-    name: 'Đảng ủy Phường Tương Bình Hiệp',
-    shortName: 'Phường Tương Bình Hiệp',
-    parentOrg: 'Thành ủy Thủ Dầu Một',
-    districtName: 'Thành phố Thủ Dầu Một',
-    provinceName: 'Tỉnh Bình Dương',
-    officeAddress: 'Đường Hồ Văn Cống, Phường Tương Bình Hiệp, TP. Thủ Dầu Một',
-    contactPhone: '0274 3864 555',
-    contactEmail: 'vanphong.danguy@tuongbinhhiep.gov.vn',
-    defaultSignerTitle: 'Bí thư Đảng ủy Phường',
-    status: 'ACTIVE',
-    adminEmails: ['admin.tuongbinhhiep@phuong.gov.vn'],
-    createdAt: '2025-01-25',
-    stats: {
-      totalDocuments: 59,
-      totalTasks: 18,
-      totalOfficers: 7
     }
   }
 ];
@@ -196,18 +46,28 @@ const getStoredWards = (): WardUnit[] => {
   if (typeof window === 'undefined') return INITIAL_WARDS;
   try {
     const raw = localStorage.getItem('trolycvp_wards');
-    return raw ? JSON.parse(raw) : INITIAL_WARDS;
+    if (raw) {
+      const parsed: WardUnit[] = JSON.parse(raw);
+      // Keep only 'thu-dau-mot' ward or reset to INITIAL_WARDS
+      const filtered = parsed.filter(w => w.id === 'thu-dau-mot' || w.code === 'THU_DAU_MOT');
+      if (filtered.length > 0) return filtered;
+    }
+    localStorage.setItem('trolycvp_wards', JSON.stringify(INITIAL_WARDS));
+    return INITIAL_WARDS;
   } catch (_) {
     return INITIAL_WARDS;
   }
 };
 
 const getStoredActiveWardId = (): string => {
-  if (typeof window === 'undefined') return 'phu-cuong';
+  if (typeof window === 'undefined') return 'thu-dau-mot';
   try {
-    return localStorage.getItem('trolycvp_active_ward_id') || 'phu-cuong';
+    const stored = localStorage.getItem('trolycvp_active_ward_id');
+    if (stored === 'thu-dau-mot') return 'thu-dau-mot';
+    localStorage.setItem('trolycvp_active_ward_id', 'thu-dau-mot');
+    return 'thu-dau-mot';
   } catch (_) {
-    return 'phu-cuong';
+    return 'thu-dau-mot';
   }
 };
 
@@ -257,7 +117,7 @@ export const useWardStore = create<WardState>((set, get) => ({
     }
     let newActiveId = get().activeWardId;
     if (newActiveId === id) {
-      newActiveId = updated[0]?.id || 'phu-cuong';
+      newActiveId = updated[0]?.id || 'thu-dau-mot';
       if (typeof window !== 'undefined') {
         localStorage.setItem('trolycvp_active_ward_id', newActiveId);
       }
@@ -303,9 +163,9 @@ export const useWardStore = create<WardState>((set, get) => ({
   resetToDefaults: () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('trolycvp_wards', JSON.stringify(INITIAL_WARDS));
-      localStorage.setItem('trolycvp_active_ward_id', 'phu-cuong');
+      localStorage.setItem('trolycvp_active_ward_id', 'thu-dau-mot');
     }
-    set({ wards: INITIAL_WARDS, activeWardId: 'phu-cuong' });
+    set({ wards: INITIAL_WARDS, activeWardId: 'thu-dau-mot' });
   }
 }));
 

@@ -148,8 +148,8 @@ export default function UserAdminMenu({
         onClick={onClose}
       />
 
-      {/* Dropdown Menu Container */}
-      <div className="fixed top-18 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[500px] max-h-[88vh] bg-white/98 backdrop-blur-xl rounded-3xl shadow-2xl border border-blue-100 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      {/* Dropdown Menu Container - Positioned at Bottom Left */}
+      <div className="fixed bottom-4 left-4 md:left-[270px] z-50 w-[calc(100vw-2rem)] sm:w-[480px] max-h-[85vh] bg-white/98 backdrop-blur-xl rounded-3xl shadow-2xl border border-blue-100 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* User Card Header */}
         <div className="p-5 bg-gradient-to-r from-blue-950 via-blue-900 to-indigo-950 text-white relative flex-shrink-0">
           <div className="flex items-start justify-between gap-3">
