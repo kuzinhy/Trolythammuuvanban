@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Document } from '../types';
+import { safeFetchJson } from '../lib/safeFetch';
 import DispatchSlip from '../components/DispatchSlip';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 import { 
@@ -206,7 +207,7 @@ export default function Search() {
         setResults(filtered);
       } else {
         // AI Semantic Deep Inquiry Mode
-        const res = await fetch('/api/search-ai', {
+        const res = await safeFetchJson<AISearchResult>('/api/search-ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -215,8 +216,8 @@ export default function Search() {
           })
         });
 
-        if (!res.ok) throw new Error("Tra cứu AI thất bại");
-        const aiData: AISearchResult = await res.json();
+        if (!res.ok || !res.data) throw new Error(res.error || "Tra cứu AI thất bại");
+        const aiData: AISearchResult = res.data;
         setAiAnalysisResult(aiData);
 
         const matchedDocs: Document[] = [];

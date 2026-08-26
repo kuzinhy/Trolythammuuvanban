@@ -17,6 +17,7 @@ import { MultimodalAnalyticsCenter } from '../components/MultimodalAnalyticsCent
 import DailyScenarioTraining from '../components/DailyScenarioTraining';
 import AssistantTrainer from '../components/AssistantTrainer';
 import { Document, Task } from '../types';
+import { safeFetchJson } from '../lib/safeFetch';
 
 export default function AiAssistant() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -95,7 +96,7 @@ export default function AiAssistant() {
         recentTasks: overdueTasks.slice(0, 5).map(t => ({ title: t.title, assignee: t.assignedOrganization, dueDate: t.dueDate }))
       };
 
-      const res = await fetch('/api/chat', {
+      const res = await safeFetchJson<{ reply: string }>('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,9 +107,8 @@ export default function AiAssistant() {
         })
       });
 
-      const data = await res.json();
-      if (data.reply) {
-        setCustomBriefing(data.reply);
+      if (res.ok && res.data?.reply) {
+        setCustomBriefing(res.data.reply);
       }
     } catch (e) {
       console.error("Error generating briefing:", e);
@@ -137,7 +137,7 @@ export default function AiAssistant() {
 
       const targetDoc = selectedDocId !== 'ALL' ? documents.find(d => d.id === selectedDocId) : undefined;
 
-      const res = await fetch('/api/chat', {
+      const res = await safeFetchJson<{ reply: string }>('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,8 +153,7 @@ export default function AiAssistant() {
         })
       });
 
-      const data = await res.json();
-      setChatHistory(prev => [...prev, { role: 'assistant', content: data.reply || 'Xin lỗi đồng chí, tôi chưa thể tổng hợp ngay lúc này.' }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: res.data?.reply || res.error || 'Xin lỗi đồng chí, tôi chưa thể tổng hợp ngay lúc này.' }]);
 
       addInteractionRecord({
         promptSummary: queryText.slice(0, 120),

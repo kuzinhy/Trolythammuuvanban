@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Document } from '../types';
 import { FileText, Sparkles, Copy, Check, X, Loader2, RefreshCw } from 'lucide-react';
 
+import { safeFetchJson } from '../lib/safeFetch';
+
 interface DraftGeneratorProps {
   document: Document;
   onClose: () => void;
@@ -24,7 +26,7 @@ export default function DraftGenerator({ document, onClose }: DraftGeneratorProp
   const generateDraft = async (typeToGenerate: string = draftType) => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/generate-response-draft', {
+      const result = await safeFetchJson<{ draft: string }>('/api/generate-response-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -32,11 +34,10 @@ export default function DraftGenerator({ document, onClose }: DraftGeneratorProp
           draftType: typeToGenerate
         })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Soạn thảo thất bại');
+      if (!result.ok || !result.data) {
+        throw new Error(result.error || 'Soạn thảo thất bại');
       }
-      setDraftContent(data.draft || '');
+      setDraftContent(result.data.draft || '');
     } catch (err: any) {
       alert(err.message || 'Lỗi khi soạn thảo dự thảo');
     } finally {

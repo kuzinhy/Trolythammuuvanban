@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
+import { safeFetchJson } from '../lib/safeFetch';
 import { Document } from '../types';
 
 interface AIAssistantProps {
@@ -162,7 +163,7 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
         .filter(m => !m.isError)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('/api/chat', {
+      const result = await safeFetchJson<{ reply: string }>('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -177,12 +178,11 @@ export default function AIAssistant({ isOpen: controlledIsOpen, onClose, context
         })
       });
       
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Lỗi xử lý phản hồi từ AI');
+      if (!result.ok || !result.data) {
+        throw new Error(result.error || 'Lỗi xử lý phản hồi từ AI');
       }
       
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'Tôi đã tiếp nhận yêu cầu.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: result.data.reply || 'Tôi đã tiếp nhận yêu cầu.' }]);
 
       // Record in Zustand memory store
       addInteractionRecord({
