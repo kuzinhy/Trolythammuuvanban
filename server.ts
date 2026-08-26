@@ -13,6 +13,15 @@ const PORT = 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Health check and workspace token fallback
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/_system/workspace/token', (req, res) => {
+  res.json({ token: null });
+});
+
 const upload = multer({ dest: os.tmpdir() });
 
 // Lazy-safe GoogleGenAI client
@@ -2221,6 +2230,10 @@ YÊU CẦU:
   }
 });
 
+// 404 handler for unmatched /api/* or /_system/* routes to prevent SPA fallback returning HTML (200 OK)
+app.all(['/api/*', '/_system/*'], (req, res) => {
+  res.status(404).json({ error: `Đường dẫn API không tồn tại: ${req.method} ${req.path}` });
+});
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

@@ -11,19 +11,60 @@ export async function safeFetchJson<T = any>(
 ): Promise<SafeFetchResult<T>> {
   try {
     const res = await fetch(input, init);
-    const contentType = res.headers.get('content-type') || '';
+    const text = await res.text();
 
-    if (!contentType.includes('application/json')) {
-      const text = await res.text();
-      console.warn(`[safeFetchJson] Non-JSON response received from ${input} (Status: ${res.status}):`, text.slice(0, 150));
-      
-      let msg = `Máy chủ phản hồi không đúng chuẩn JSON (HTTP ${res.status}).`;
+    // 1. Try parsing JSON first regardless of Content-Type header
+    let parsedData: any = null;
+    let isJson = false;
+
+    if (text && text.trim()) {
+      const trimmed = text.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          parsedData = JSON.parse(trimmed);
+          isJson = true;
+        } catch (_) {
+          isJson = false;
+        }
+      }
+    }
+
+    if (isJson && parsedData !== null) {
+      if (!res.ok) {
+        return {
+          ok: false,
+          status: res.status,
+          data: parsedData,
+          error: parsedData?.error || parsedData?.message || `Yêu cầu xử lý thất bại (HTTP ${res.status})`
+        };
+      }
+      return {
+        ok: true,
+        status: res.status,
+        data: parsedData
+      };
+    }
+
+    // 2. Handle HTML or non-JSON responses (e.g. SPA fallback index.html for unhandled API routes)
+    const lowerText = text.toLowerCase();
+    const isHtml = lowerText.includes('<!doctype') || lowerText.includes('<html');
+
+    if (isHtml) {
+      console.warn(`[safeFetchJson] HTML response received from ${input} (Status: ${res.status}). Likely SPA fallback for missing endpoint.`);
+      return {
+        ok: false,
+        status: res.status === 200 ? 404 : res.status,
+        error: `Đường dẫn API không khả dụng hoặc bị điều hướng về trang giao diện HTML (HTTP ${res.status}).`
+      };
+    }
+
+    if (!res.ok) {
+      let msg = `Máy chủ báo lỗi (HTTP ${res.status}).`;
       if (res.status === 404) {
-        msg = `API không tồn tại hoặc Vercel chưa định tuyến Backend Serverless (/api). HTTP 404.`;
+        msg = `Đường dẫn API không tồn tại (HTTP 404).`;
       } else if (res.status >= 500) {
         msg = `Máy chủ backend báo lỗi nội bộ (HTTP ${res.status}).`;
       }
-
       return {
         ok: false,
         status: res.status,
@@ -31,32 +72,14 @@ export async function safeFetchJson<T = any>(
       };
     }
 
-    let data: any;
-    try {
-      data = await res.json();
-    } catch (parseErr) {
-      console.warn(`[safeFetchJson] Failed to parse JSON body from ${input}:`, parseErr);
-      return {
-        ok: false,
-        status: res.status,
-        error: `Phản hồi từ máy chủ không hợp lệ (không phải định dạng JSON chuẩn).`
-      };
-    }
-
-    if (!res.ok) {
-      return {
-        ok: false,
-        status: res.status,
-        data,
-        error: data?.error || `Yêu cầu xử lý thất bại (HTTP ${res.status})`
-      };
-    }
-
+    // HTTP 200 but text is non-JSON
+    console.warn(`[safeFetchJson] Non-JSON response received from ${input} (Status: 200):`, text.slice(0, 150));
     return {
-      ok: true,
-      status: res.status,
-      data
+      ok: false,
+      status: 200,
+      error: `Phản hồi từ máy chủ không thuộc định dạng JSON chuẩn (HTTP 200).`
     };
+
   } catch (err: any) {
     console.error(`[safeFetchJson Exception] ${input}:`, err);
     return {
@@ -66,3 +89,4 @@ export async function safeFetchJson<T = any>(
     };
   }
 }
+
