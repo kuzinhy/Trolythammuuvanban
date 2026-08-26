@@ -16,6 +16,7 @@ import {
 } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { useAuthStore } from '../store/authStore';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface DraftResult {
   option1: string;
@@ -497,7 +498,7 @@ export default function DirectiveDrafting() {
         ? `Tham chiếu văn phong từ Thông báo kết luận thực tế: "${selectedNoticeReference.code} - ${selectedNoticeReference.title}". Mẫu đoạn văn: "${selectedNoticeReference.paragraphExcerpt.substring(0, 300)}..."`
         : undefined;
 
-      const res = await fetch('/api/draft-directive', {
+      const res = await safeFetchJson<DraftResult>('/api/draft-directive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -511,8 +512,8 @@ export default function DirectiveDrafting() {
         })
       });
 
-      if (!res.ok) throw new Error("Yêu cầu tạo văn bản chỉ đạo thất bại");
-      const data: DraftResult = await res.json();
+      if (!res.ok || !res.data) throw new Error(res.error || "Yêu cầu tạo văn bản chỉ đạo thất bại");
+      const data: DraftResult = res.data;
       setResult(data);
       setSelectedOptionTab('option1');
       setEditableContent(data.option1);
@@ -652,7 +653,7 @@ export default function DirectiveDrafting() {
     setSavedRaciSuccess(false);
 
     try {
-      const res = await fetch('/api/extract-raci-tasks', {
+      const res = await safeFetchJson<RaciExtractionResult>('/api/extract-raci-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -662,8 +663,8 @@ export default function DirectiveDrafting() {
         })
       });
 
-      if (!res.ok) throw new Error("Không thể bóc tách ma trận RACI.");
-      const data: RaciExtractionResult = await res.json();
+      if (!res.ok || !res.data) throw new Error(res.error || "Không thể bóc tách ma trận RACI.");
+      const data: RaciExtractionResult = res.data;
       setRaciResult(data);
     } catch (err: any) {
       console.error(err);
@@ -715,7 +716,7 @@ export default function DirectiveDrafting() {
   const handleGenerateBriefing = async () => {
     setIsGeneratingBriefing(true);
     try {
-      const res = await fetch('/api/generate-meeting-briefing', {
+      const res = await safeFetchJson<MeetingBriefingResult>('/api/generate-meeting-briefing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -726,8 +727,8 @@ export default function DirectiveDrafting() {
         })
       });
 
-      if (!res.ok) throw new Error("Không thể lập bản tin điều hành cuộc họp.");
-      const data: MeetingBriefingResult = await res.json();
+      if (!res.ok || !res.data) throw new Error(res.error || "Không thể lập bản tin điều hành cuộc họp.");
+      const data: MeetingBriefingResult = res.data;
       setBriefingResult(data);
     } catch (err: any) {
       console.error(err);
@@ -748,7 +749,7 @@ export default function DirectiveDrafting() {
   const handleRunDeepBrainLearn = async () => {
     setIsLearningBrain(true);
     try {
-      const res = await fetch('/api/deep-drive-sync-learn', {
+      const res = await safeFetchJson<DeepDriveLearnResult>('/api/deep-drive-sync-learn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -757,8 +758,8 @@ export default function DirectiveDrafting() {
         })
       });
 
-      if (!res.ok) throw new Error("Không thể thực hiện quy trình tự học sâu từ Google Drive.");
-      const data: DeepDriveLearnResult = await res.json();
+      if (!res.ok || !res.data) throw new Error(res.error || "Không thể thực hiện quy trình tự học sâu từ Google Drive.");
+      const data: DeepDriveLearnResult = res.data;
       setDriveBrainResult(data);
       setSuccessMsg("Bộ não AI Cấp ủy đã tự học và đồng bộ xong tri thức từ Google Drive!");
       setTimeout(() => setSuccessMsg(null), 3000);

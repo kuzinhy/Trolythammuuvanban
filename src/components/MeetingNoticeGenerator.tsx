@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FileText, Sparkles, Copy, Check, Printer, RefreshCw, AlertCircle, Calendar, Users, Building2, CheckSquare } from 'lucide-react';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface DirectiveItem {
   topic: string;
@@ -38,7 +39,7 @@ export function MeetingNoticeGenerator() {
     try {
       const directivesArray = directivesText.split(';').map(s => s.trim()).filter(Boolean);
 
-      const res = await fetch('/api/generate-meeting-notice', {
+      const res = await safeFetchJson<NoticeData>('/api/generate-meeting-notice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -50,13 +51,11 @@ export function MeetingNoticeGenerator() {
         })
       });
 
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || 'Lỗi khi dự thảo thông báo kết luận');
+      if (!res.ok || !res.data) {
+        throw new Error(res.error || 'Lỗi khi dự thảo thông báo kết luận');
       }
 
-      const data: NoticeData = await res.json();
-      setNoticeData(data);
+      setNoticeData(res.data);
     } catch (err: any) {
       setError(err.message || 'Không thể tạo thông báo kết luận.');
     } finally {

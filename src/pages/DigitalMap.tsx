@@ -14,6 +14,7 @@ import {
   onSnapshot, serverTimestamp, query, orderBy 
 } from 'firebase/firestore';
 import { useAuthStore } from '../store/authStore';
+import { safeFetchJson } from '../lib/safeFetch';
 
 export interface IncidentResponseResult {
   threatLevel: string;
@@ -803,7 +804,7 @@ export default function DigitalMap() {
     setIsLoadingPlaybook(true);
 
     try {
-      const res = await fetch('/api/ai-predict-incident-response', {
+      const res = await safeFetchJson<IncidentResponseResult>('/api/ai-predict-incident-response', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -816,8 +817,8 @@ export default function DigitalMap() {
         })
       });
 
-      if (!res.ok) throw new Error("Không thể tạo kịch bản tác chiến.");
-      const data: IncidentResponseResult = await res.json();
+      if (!res.ok || !res.data) throw new Error(res.error || "Không thể tạo kịch bản tác chiến.");
+      const data: IncidentResponseResult = res.data;
       setPlaybookResult(data);
     } catch (err: any) {
       console.error(err);

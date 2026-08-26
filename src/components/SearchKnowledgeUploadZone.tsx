@@ -9,6 +9,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, getAccessToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { Document } from '../types';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface SearchKnowledgeUploadZoneProps {
   onDocumentAdded: (newDoc: Document) => void;
@@ -47,10 +48,9 @@ export default function SearchKnowledgeUploadZone({ onDocumentAdded, referenceDo
 
       if (!workspaceToken) {
         try {
-          const tokenRes = await fetch("/_system/workspace/token");
-          if (tokenRes.ok) {
-            const data = await tokenRes.json();
-            workspaceToken = data.token;
+          const tokenRes = await safeFetchJson("/_system/workspace/token");
+          if (tokenRes.ok && tokenRes.data) {
+            workspaceToken = tokenRes.data.token;
           }
         } catch (e) {
           console.warn("Workspace token lookup:", e);
@@ -67,16 +67,16 @@ export default function SearchKnowledgeUploadZone({ onDocumentAdded, referenceDo
         formData.append('workspaceToken', workspaceToken);
       }
 
-      const uploadRes = await fetch('/api/analyze', {
+      const uploadRes = await safeFetchJson('/api/analyze', {
         method: 'POST',
         headers: workspaceToken ? { 'Authorization': `Bearer ${workspaceToken}` } : {},
         body: formData,
       });
 
-      const data = await uploadRes.json();
-      if (!uploadRes.ok) {
-        throw new Error(data.error || 'Trích xuất và lập chỉ mục văn bản thất bại.');
+      if (!uploadRes.ok || !uploadRes.data) {
+        throw new Error(uploadRes.error || 'Trích xuất và lập chỉ mục văn bản thất bại.');
       }
+      const data = uploadRes.data;
 
       setUploadStep('Đang lưu vào Kho cơ sở tri thức tra cứu...');
 

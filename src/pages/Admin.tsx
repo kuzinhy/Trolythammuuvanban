@@ -18,6 +18,7 @@ import {
   TARGET_DRIVE_FOLDER_ID, TARGET_DRIVE_FOLDER_URL, getAccessToken, requestDriveAccess,
   CONNECTED_APP_ID, CONNECTED_APP_URL, CONNECTED_APP_NAME
 } from '../lib/firebase';
+import { safeFetchJson } from '../lib/safeFetch';
 import { 
   checkAppConnectionStatus, exportDatabaseBackup, importDatabaseBackup, DEFAULT_APP_CONNECTION 
 } from '../lib/syncService';
@@ -844,7 +845,7 @@ export default function Admin() {
         return;
       }
 
-      const res = await fetch('/api/drive/export-brain', {
+      const res = await safeFetchJson('/api/drive/export-brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -861,8 +862,8 @@ export default function Admin() {
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (res.ok && res.data?.success) {
+        const data = res.data;
         setBrainSyncStatus("Đã sao lưu thành công Bộ Não AI lên Google Drive!");
         setBrainDriveInfo({
           fileId: data.driveFileId,
@@ -873,7 +874,7 @@ export default function Admin() {
           ruleCount: learnedRules.length
         });
       } else {
-        setBrainSyncStatus(`Lỗi xuất Bộ Não AI: ${data.error || 'Không xác định'}`);
+        setBrainSyncStatus(`Lỗi xuất Bộ Não AI: ${res.error || res.data?.error || 'Không xác định'}`);
       }
     } catch (err: any) {
       console.error("Export brain error:", err);
@@ -899,7 +900,7 @@ export default function Admin() {
         return;
       }
 
-      const res = await fetch('/api/drive/import-brain', {
+      const res = await safeFetchJson('/api/drive/import-brain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -908,9 +909,8 @@ export default function Admin() {
         })
       });
 
-      const data = await res.json();
-      if (data.success && data.brainData) {
-        const brain = data.brainData;
+      if (res.ok && res.data?.success && res.data?.brainData) {
+        const brain = res.data.brainData;
         
         if (brain.learnedRules && Array.isArray(brain.learnedRules)) {
           setLearnedRules(brain.learnedRules);
@@ -930,8 +930,8 @@ export default function Admin() {
 
         setBrainSyncStatus(`Đã nạp thành công Bộ Não AI! (${brain.learnedRules?.length || 0} quy tắc máy học, ${brain.departments?.length || 0} phòng ban)`);
         setBrainDriveInfo({
-          fileId: data.fileId,
-          updatedAt: data.modifiedTime,
+          fileId: res.data.fileId,
+          updatedAt: res.data.modifiedTime,
           ruleCount: brain.learnedRules?.length || 0
         });
 
@@ -955,7 +955,7 @@ export default function Admin() {
         }
 
       } else {
-        setBrainSyncStatus(`Lỗi: ${data.error || 'Không tìm thấy Bộ Não AI trên Google Drive'}`);
+        setBrainSyncStatus(`Lỗi: ${res.error || res.data?.error || 'Không tìm thấy Bộ Não AI trên Google Drive'}`);
       }
     } catch (err: any) {
       console.error("Import brain error:", err);
@@ -980,7 +980,7 @@ export default function Admin() {
         return;
       }
 
-      const res = await fetch('/api/brain/synthesize-knowledge', {
+      const res = await safeFetchJson('/api/brain/synthesize-knowledge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -989,10 +989,9 @@ export default function Admin() {
         })
       });
 
-      const data = await res.json();
-      if (data.newRules && Array.isArray(data.newRules) && data.newRules.length > 0) {
+      if (res.ok && res.data?.newRules && Array.isArray(res.data.newRules) && res.data.newRules.length > 0) {
         const addedRules: LearningRule[] = [];
-        for (const nr of data.newRules) {
+        for (const nr of res.data.newRules) {
           const saved = await saveLearnedAdjustmentRule({
             keywordTrigger: nr.keywordTrigger,
             suggestedLeadDept: nr.suggestedLeadDept,

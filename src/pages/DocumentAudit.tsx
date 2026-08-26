@@ -8,6 +8,7 @@ import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../store/authStore';
 import * as Diff from 'diff';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface AuditErrorItem {
   id: string;
@@ -116,27 +117,17 @@ export default function DocumentAudit() {
         formData.append('text', documentText);
       }
 
-      const res = await fetch('/api/audit-document', {
+      const res = await safeFetchJson<AuditResult>('/api/audit-document', {
         method: 'POST',
         body: selectedFile ? formData : JSON.stringify({ text: documentText }),
         headers: selectedFile ? undefined : { 'Content-Type': 'application/json' }
       });
 
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResp = await res.text();
-        if (textResp.includes('<!doctype') || textResp.includes('<html')) {
-          throw new Error('Máy chủ đang khởi động lại hoặc gặp sự cố (Nhận được trang HTML). Vui lòng thử lại sau giây lát.');
-        }
-        throw new Error(textResp || 'Yêu cầu rà soát văn bản thất bại.');
+      if (!res.ok || !res.data) {
+        throw new Error(res.error || 'Yêu cầu rà soát văn bản thất bại.');
       }
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Yêu cầu rà soát văn bản thất bại.');
-      }
-
-      setResult(data);
+      setResult(res.data);
       setActiveTab('errors');
       setSuccessMsg('Đã hoàn tất rà soát chính tả, thể thức và tinh chỉnh văn bản thành công!');
       setTimeout(() => setSuccessMsg(null), 4000);

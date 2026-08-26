@@ -31,7 +31,18 @@ export async function safeFetchJson<T = any>(
       };
     }
 
-    const data = await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      console.warn(`[safeFetchJson] Failed to parse JSON body from ${input}:`, parseErr);
+      return {
+        ok: false,
+        status: res.status,
+        error: `Phản hồi từ máy chủ không hợp lệ (không phải định dạng JSON chuẩn).`
+      };
+    }
+
     if (!res.ok) {
       return {
         ok: false,

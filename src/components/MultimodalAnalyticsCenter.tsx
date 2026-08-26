@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileUp, Eye, Sparkles, CheckCircle2, AlertTriangle, FileText, Download, RefreshCw, Cpu, Layers, ArrowRight, ShieldCheck, CheckSquare, Clock } from 'lucide-react';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface TaskExtracted {
   taskName: string;
@@ -50,18 +51,16 @@ export function MultimodalAnalyticsCenter() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/analyze-multimodal-file', {
+      const res = await safeFetchJson<MultimodalResult>('/api/analyze-multimodal-file', {
         method: 'POST',
         body: formData,
       });
 
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || 'Lỗi khi phân tích tệp đa phương thức');
+      if (!res.ok || !res.data) {
+        throw new Error(res.error || 'Lỗi khi phân tích tệp đa phương thức');
       }
 
-      const data: MultimodalResult = await res.json();
-      setResult(data);
+      setResult(res.data);
     } catch (err: any) {
       setError(err.message || 'Không thể phân tích tệp đa phương thức.');
     } finally {

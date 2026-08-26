@@ -15,6 +15,7 @@ import { isUrgentDocument, isDocumentCompleted } from '../lib/documentUtils';
 import { TaskReminderToasts, TaskReminderAlertBanner } from '../components/TaskReminderToasts';
 import ImportantDocumentsSection from '../components/ImportantDocumentsSection';
 import BrainTrainingModal from '../components/BrainTrainingModal';
+import { safeFetchJson } from '../lib/safeFetch';
 import { getContributorProfile, DAILY_SCENARIOS_BANK } from '../lib/learningEngine';
 
 const TARGET_DRIVE_FOLDER_ID = '1PYVbIAYivf3xrqxBc5YENp2C3kJwlqVR';
@@ -152,10 +153,9 @@ export default function Dashboard() {
 
       if (!workspaceToken) {
         try {
-          const tokenRes = await fetch("/_system/workspace/token");
-          if (tokenRes.ok) {
-            const data = await tokenRes.json();
-            workspaceToken = data.token;
+          const tokenRes = await safeFetchJson("/_system/workspace/token");
+          if (tokenRes.ok && tokenRes.data) {
+            workspaceToken = tokenRes.data.token;
           }
         } catch (e) {
           console.warn("Workspace system token lookup:", e);
@@ -171,14 +171,16 @@ export default function Dashboard() {
         formData.append('workspaceToken', workspaceToken);
       }
 
-      const uploadRes = await fetch('/api/analyze', {
+      const uploadRes = await safeFetchJson('/api/analyze', {
         method: 'POST',
         headers: workspaceToken ? { 'Authorization': `Bearer ${workspaceToken}` } : {},
         body: formData,
       });
 
-      const data = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(data.error || 'Tải lên và phân tích văn bản thất bại');
+      if (!uploadRes.ok || !uploadRes.data) {
+        throw new Error(uploadRes.error || 'Tải lên và phân tích văn bản thất bại');
+      }
+      const data = uploadRes.data;
 
       setUploadStep('Đang lưu trữ hồ sơ dịch vụ công...');
 

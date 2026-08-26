@@ -12,6 +12,7 @@ import {
   submitScenarioReview,
   getActiveLearningRules
 } from '../lib/learningEngine';
+import { safeFetchJson } from '../lib/safeFetch';
 import { 
   Sparkles, 
   Star, 
@@ -98,17 +99,14 @@ export default function DailyScenarioTraining({ onRuleAdded }: DailyScenarioTrai
   const handleGenerateNewScenario = async () => {
     setIsGeneratingNew(true);
     try {
-      const res = await fetch('/api/generate-scenario', {
+      const res = await safeFetchJson<{ scenario: ScenarioItem }>('/api/generate-scenario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category: selectedCategory !== 'ALL' ? selectedCategory : undefined })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.scenario && data.scenario.title) {
-          setScenarios(prev => [data.scenario, ...prev]);
-          setActiveScenarioId(data.scenario.id);
-        }
+      if (res.ok && res.data?.scenario?.title) {
+        setScenarios(prev => [res.data.scenario, ...prev]);
+        setActiveScenarioId(res.data.scenario.id);
       }
     } catch (err) {
       console.error('Error generating scenario:', err);

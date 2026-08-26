@@ -13,6 +13,7 @@ import DraftGenerator from '../components/DraftGenerator';
 import { getDocumentProgressStatus, isDocumentCompleted } from '../lib/documentUtils';
 import { getDocumentTags, getTagStyle, STANDARD_TAGS } from '../lib/tagUtils';
 import { getActiveLearningRules, saveLearnedAdjustmentRule, matchTextAgainstLearnedRules, type LearningRule } from '../lib/learningEngine';
+import { safeFetchJson } from '../lib/safeFetch';
 
 export default function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -231,7 +232,7 @@ export default function DocumentDetail() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('workspaceToken', authToken);
-        return fetch('/api/drive/sync-file', {
+        return safeFetchJson('/api/drive/sync-file', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${authToken}` },
           body: formData,
@@ -249,10 +250,10 @@ export default function DocumentDetail() {
         }
       }
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Đồng bộ Google Drive thất bại');
+      if (!res.ok || !res.data) {
+        throw new Error(res.error || 'Đồng bộ Google Drive thất bại');
       }
+      const data = res.data;
 
       // Update Firestore document
       await updateDoc(doc(db, 'documents', id), {
@@ -308,16 +309,15 @@ export default function DocumentDetail() {
     if (!document) return;
     try {
       setSummarizingDoc(true);
-      const res = await fetch('/api/summarize-document', {
+      const res = await safeFetchJson('/api/summarize-document', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentData: document })
       });
-      const data = await res.json();
-      if (res.ok) {
-        setDocumentSummary(data);
+      if (res.ok && res.data) {
+        setDocumentSummary(res.data);
       } else {
-        alert(data.error || 'Tóm tắt văn bản thất bại.');
+        alert(res.error || 'Tóm tắt văn bản thất bại.');
       }
     } catch (err: any) {
       console.error('Error summarizing document:', err);
@@ -370,14 +370,14 @@ Nội dung chi tiết: ${document.fullContent || document.summary || ''}`;
       formData.append('file', file);
       formData.append('workspaceToken', token);
 
-      const res = await fetch('/api/drive/sync-file', {
+      const res = await safeFetchJson('/api/drive/sync-file', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
       });
 
-      const data = await res.json();
-      if (res.ok && data.driveFileId) {
+      if (res.ok && res.data && res.data.driveFileId) {
+        const data = res.data;
         await updateDoc(doc(db, 'documents', id), {
           driveFileId: data.driveFileId,
           driveUrl: data.driveUrl,
@@ -404,17 +404,16 @@ Nội dung chi tiết: ${document.fullContent || document.summary || ''}`;
       // Simultaneously upload/sync to Google Drive if not already synced
       await autoSyncToDriveIfNeeded();
 
-      const res = await fetch('/api/extract-tasks', {
+      const res = await safeFetchJson<{ tasks: Task[] }>('/api/extract-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis: document })
       });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || 'Trích xuất nhiệm vụ thất bại do hệ thống AI đang bận. Vui lòng thử lại sau.');
+      if (!res.ok || !res.data) {
+        alert(res.error || 'Trích xuất nhiệm vụ thất bại do hệ thống AI đang bận. Vui lòng thử lại sau.');
         return;
       }
-      setExtractedTasks(data.tasks || []);
+      setExtractedTasks(res.data.tasks || []);
       setActiveTab('tasks');
     } catch (e: any) {
       console.error(e);

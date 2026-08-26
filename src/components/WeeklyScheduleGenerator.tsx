@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calendar, Sparkles, Printer, Copy, Check, Clock, MapPin, Users, Building2, RefreshCw, AlertCircle, FileText, Download } from 'lucide-react';
 import { Document, Task } from '../types';
+import { safeFetchJson } from '../lib/safeFetch';
 
 interface EventItem {
   time: string;
@@ -42,7 +43,7 @@ export function WeeklyScheduleGenerator({ documents = [], tasks = [] }: WeeklySc
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch('/api/generate-weekly-schedule', {
+      const res = await safeFetchJson<WeeklyScheduleData>('/api/generate-weekly-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,13 +54,11 @@ export function WeeklyScheduleGenerator({ documents = [], tasks = [] }: WeeklySc
         })
       });
 
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || 'Lỗi khi kết nối với máy chủ AI');
+      if (!res.ok || !res.data) {
+        throw new Error(res.error || 'Lỗi khi kết nối với máy chủ AI');
       }
 
-      const data: WeeklyScheduleData = await res.json();
-      setScheduleData(data);
+      setScheduleData(res.data);
     } catch (err: any) {
       setError(err.message || 'Không thể khởi tạo Lịch công tác tuần.');
     } finally {
